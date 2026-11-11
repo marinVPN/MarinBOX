@@ -12,11 +12,12 @@ const { parseSubscriptionBody } = require('./lib/parser');
 const { buildConfig } = require('./lib/xray-config');
 const { PRESETS } = require('./lib/route-presets');
 const xrayUpd = require('./lib/xray-updater');
+const geositeCatalog = require('./lib/geosite-catalog');
 const updater = require('./lib/updater');
 const sysproxy = require('./lib/sysproxy');
 
 const PORTS = { socks: 10808, http: 10809 };
-const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], theme: 'dark', accent: '', pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
+const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], appRules: [], categories: [], dnsPreset: 'system', dnsCustom: '', dnsDoh: false, theme: 'dark', accent: '', pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
 let healthTimer = null;
 let reconnectTimer = null;
 let reconnectGeneration = 0;
@@ -157,7 +158,12 @@ async function cabinetRequest(pathname, { method = 'GET', body } = {}) {
 }
 function publicState() { return { subs: store.subs, selectedId: store.selectedId, settings: settings(), status, version: updater.CURRENT_VERSION }; }
 function notify() { saveStore(); send('state:changed', publicState()); }
-function send(ch, payload) { if (win && !win.isDestroyed()) win.webContents.send(ch, payload); }
+function send(ch, payload) {
+  // шлём во все окна: основное и виджет
+  for (const target of [win, widget]) {
+    if (target && !target.isDestroyed()) target.webContents.send(ch, payload);
+  }
+}
 function findServer(id) {
   for (const s of store.subs) { const x = s.servers.find((v) => v.id === id); if (x) return x; }
   return null;
@@ -489,6 +495,8 @@ async function connect(id, { retry = false } = {}) {
     fs.writeFileSync(cfgPath(), JSON.stringify(buildConfig(server, {
       ...PORTS, logLevel: cfg.logLevel, logPath: logPath(), bypassDomains: domains, bypassIps: ips,
       routePresets: cfg.routePresets || [], tun: !!cfg.tun,
+      appRules: cfg.appRules || [], categories: cfg.categories || [],
+      dnsPreset: cfg.dnsPreset || 'system', dnsCustom: cfg.dnsCustom || '', dnsDoh: !!cfg.dnsDoh,
     }), null, 2));
     if (cfg.tun) {
       // TUN: xray elevated, весь трафик системы в туннеле — системный прокси не нужен
@@ -508,6 +516,31 @@ async function connect(id, { retry = false } = {}) {
     pushNotification('MarinBox', `Не удалось подключиться: ${e.message}`);
     throw e;
   }
+}
+
+// ───────────── квик-виджет ─────────────
+let widget = null;
+
+function createWidget() {
+  if (widget && !widget.isDestroyed()) { widget.show(); widget.focus(); return; }
+  widget = new BrowserWindow({
+    width: 268, height: 208, frame: false, resizable: false, maximizable: false, minimizable: false,
+    minWidth: 268, maxWidth: 268, minHeight: 208, maxHeight: 208,
+    skipTaskbar: true, alwaysOnTop: true, transparent: true, hasShadow: false,
+    backgroundColor: '#00000000', title: 'MarinBox Widget',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    },
+  });
+  widget.setAlwaysOnTop(true, 'floating');
+  widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  widget.loadFile(path.join(__dirname, 'renderer', 'widget.html'));
+  widget.on('closed', () => { widget = null; });
+}
+
+function hideWidget() {
+  if (widget && !widget.isDestroyed()) widget.hide();
 }
 
 // ───────────── окно, трей, ссылки ─────────────
@@ -560,6 +593,8 @@ function rebuildTray() {
       enabled: status.state !== 'connecting' && (on || !!store.selectedId),
       click: () => (on ? disconnect() : connect(store.selectedId).catch((e) => send('toast', e.message))),
     },
+    { type: 'separator' },
+    { label: 'Виджет', click: () => (widget && !widget.isDestroyed() && widget.isVisible() ? hideWidget() : createWidget()) },
     { type: 'separator' },
     { label: 'Выход', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -825,6 +860,23 @@ function setupIpc() {
       routePresets: Array.isArray(settings?.routePresets)
         ? settings.routePresets.filter((id) => PRESET_IDS.has(id)).slice(0, PRESET_IDS.size)
         : [],
+      // Правила по приложениям: процесс + режим (direct / proxy / block)
+      appRules: Array.isArray(settings?.appRules)
+        ? settings.appRules
+          .map((r) => ({ process: String(r?.process || '').trim().slice(0, 80), mode: ['direct', 'proxy', 'block'].includes(r?.mode) ? r.mode : 'proxy' }))
+          .filter((r) => r.process)
+          .slice(0, 50)
+        : [],
+      // Категории geosite: имя + режим (block / direct)
+      categories: Array.isArray(settings?.categories)
+        ? settings.categories
+          .map((c) => ({ name: String(c?.name || '').trim().slice(0, 60), mode: c?.mode === 'direct' ? 'direct' : 'block' }))
+          .filter((c) => /^category-|^geolocation-/i.test(c.name))
+          .slice(0, 200)
+        : [],
+      dnsPreset: ['system', 'cloudflare', 'google', 'quad9', 'yandex', 'custom'].includes(settings?.dnsPreset) ? settings.dnsPreset : 'system',
+      dnsCustom: String(settings?.dnsCustom || '').slice(0, 500),
+      dnsDoh: !!settings?.dnsDoh,
       pingType: pingTypes.includes(settings?.pingType) ? settings.pingType : 'proxy-get',
       healthCheck: settings?.healthCheck !== false,
       healthInterval: bounded(settings?.healthInterval, DEFAULT_SETTINGS.healthInterval, 10, 600),
@@ -876,6 +928,11 @@ function setupIpc() {
     return true;
   });
   handle('route:presets', async () => PRESETS.map(({ id, label, hint }) => ({ id, label, hint })));
+  handle('route:categories', async () => {
+    const dir = path.dirname(xrayPath());
+    const list = geositeCatalog.buildCatalog(path.join(dir, 'geosite.dat'));
+    return list;
+  });
   handle('xray:check', async () => {
     const current = xrayVersion(xrayPath());
     const release = await fetchXrayRelease();
@@ -947,6 +1004,11 @@ function setupIpc() {
 
   ipcMain.on('win:min', () => win && win.minimize());
   ipcMain.on('win:hide', () => win && win.hide());
+  ipcMain.on('widget:hide', () => hideWidget());
+  ipcMain.on('widget:toggle', () => {
+    if (widget && !widget.isDestroyed() && widget.isVisible()) hideWidget();
+    else createWidget();
+  });
 }
 
 // ───────────── запуск ─────────────
