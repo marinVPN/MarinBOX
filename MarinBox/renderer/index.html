@@ -86,71 +86,117 @@
         </section>
       </div>
       <div class="page" id="page-settings" hidden>
-        <section class="glass settings-card">
-          <div class="sec-title">Поведение приложения</div>
-          <label class="setting-row"><span><b>Запускать вместе с Windows</b><small>Открывать MarinBox при входе в систему</small></span><input id="settingStartup" type="checkbox"></label>
-          <label class="setting-row"><span><b>При закрытии окна</b><small>Включено — свернуть в трей; выключено — полностью выйти</small></span><input id="settingTray" type="checkbox"></label>
-          <label class="setting-row"><span><b>Автообновление подписок</b><small>Обновлять подписки при запуске</small></span><input id="settingRefresh" type="checkbox"></label>
-          <label class="setting-row"><span><b>Уведомления Windows</b><small>Сообщать о подключении, потере связи и обновлениях</small></span><input id="settingNotify" type="checkbox"></label>
-          <label class="setting-row"><span><b>Автообновление приложения</b><small>Проверять новую версию MarinBox при запуске</small></span><input id="settingAutoUpdate" type="checkbox"></label>
-        </section>
-        <section class="glass settings-card ping-settings">
-          <div class="sec-title">Тип пинга</div>
-          <div class="ping-options" role="radiogroup" aria-label="Тип пинга">
-            <label class="ping-option"><input type="radio" name="pingType" value="proxy-get"><span><b>через Proxy GET</b><small>Запрос через VPN-туннель до тестового HTTPS-сервера</small></span></label>
-            <label class="ping-option"><input type="radio" name="pingType" value="proxy-head"><span><b>через Proxy HEAD</b><small>Проверка через VPN без загрузки тела страницы</small></span></label>
-            <label class="ping-option"><input type="radio" name="pingType" value="tcp"><span><b>TCP</b><small>Время подключения к узлу выбранного сервера</small></span></label>
-            <label class="ping-option"><input type="radio" name="pingType" value="icmp"><span><b>ICMP</b><small>Системный ping до узла выбранного сервера</small></span></label>
-          </div>
-        </section>
-        <section class="glass settings-card">
-          <div class="sec-title">Надёжность VPN</div>
-          <label class="setting-row"><span><b>Проверять соединение</b><small>Проверка VPN-туннеля через прокси</small></span><input id="settingHealthCheck" type="checkbox"></label>
-          <label class="setting-row"><span><b>Интервал проверки, секунд</b><small>От 10 до 600 секунд</small></span><input id="settingHealthInterval" class="number-setting" type="number" min="10" max="600" step="5"></label>
-          <label class="setting-row"><span><b>Автопереподключение</b><small>Повторять попытки после потери связи</small></span><input id="settingAutoReconnect" type="checkbox"></label>
-          <label class="setting-row"><span><b>Число попыток</b><small>От 1 до 20 попыток</small></span><input id="settingReconnectAttempts" class="number-setting" type="number" min="1" max="20"></label>
-          <label class="setting-row"><span><b>Пауза между попытками, секунд</b><small>От 1 до 120 секунд</small></span><input id="settingReconnectDelay" class="number-setting" type="number" min="1" max="120"></label>
-        </section>
-        <section class="glass settings-card">
-          <div class="sec-title">Xray и маршрутизация</div>
-          <label class="setting-row"><span><b>Уровень журнала Xray</b><small>Подробность записей в файле лога</small></span>
-            <select id="settingLogLevel">
-              <option value="none">Выключен</option><option value="error">Ошибки</option><option value="warning">Обычный</option><option value="info">Подробный</option><option value="debug">Отладка</option>
-            </select>
-          </label>
-          <label class="setting-row"><span><b>Домены напрямую</b><small>Через запятую или с новой строки; изменения применятся при следующем подключении</small></span><textarea id="settingBypassDomains" rows="3" placeholder="example.com"></textarea></label>
-          <label class="setting-row"><span><b>IP-адреса и CIDR напрямую</b><small>IPv4/IPv6; изменения применятся при следующем подключении</small></span><textarea id="settingBypassIps" rows="3" placeholder="192.0.2.10"></textarea></label>
-          <button class="ghost" id="btnOpenLog">Открыть лог Xray</button>
-        </section>
-        <section class="glass settings-card">
-          <div class="sec-title">Правила маршрутизации</div>
-          <p class="muted">Готовые наборы правил применяются при следующем подключении.</p>
-          <div id="routePresets" class="preset-list"></div>
-        </section>
-        <section class="glass settings-card tun-card">
-          <div class="sec-title">TUN-режим</div>
-          <label class="setting-row"><span><b>Весь трафик через VPN</b><small>Приложения, которые игнорируют системный прокси, тоже пойдут в туннель</small></span><input id="settingTun" type="checkbox"></label>
-          <p class="muted">Нужны права администратора: при подключении Windows спросит разрешение (UAC) — это запускает Xray с Wintun. Системный прокси в этом режиме отключается, трафик идёт через TUN-интерфейс. Изменение режима переподключает VPN.</p>
-        </section>
-        <section class="glass settings-card update-card">
-          <div class="sec-title">Обновление</div>
-          <p class="muted">Установлена версия <b id="appVersion">—</b></p>
-          <p id="updateNotice" class="cabinet-notice" role="status" aria-live="polite"></p>
-          <div class="dlg-actions">
-            <button class="ghost" id="btnChangelog" type="button">Что нового</button>
-            <button class="ghost" id="btnCheckUpdate" type="button">Проверить обновления</button>
-            <div class="spacer"></div>
-            <button class="primary" id="btnDownloadUpdate" type="button" hidden>Скачать</button>
-            <button class="primary" id="btnInstallUpdate" type="button" hidden>Установить</button>
-          </div>
-        </section>
-        <section class="glass settings-card support-card">
-          <div class="sec-title">Поддержка</div>
-          <p class="muted">Помощь с подключением и подпиской — в Telegram.</p>
-          <a class="primary support-button" href="https://t.me/mar1n3x" target="_blank" rel="noreferrer">Написать в поддержку</a>
-          <a class="bot-link" href="https://t.me/marinvpnspeed_bot" target="_blank" rel="noreferrer">Telegram-бот ↗</a>
-        </section>
-        <button class="ghost reset-settings" id="btnResetSettings">Сбросить настройки</button>
+        <nav class="settings-tabs" id="settingsTabs" aria-label="Разделы настроек">
+          <button class="settings-tab active" data-section="app" type="button">Приложение</button>
+          <button class="settings-tab" data-section="vpn" type="button">VPN</button>
+          <button class="settings-tab" data-section="routes" type="button">Маршрутизация</button>
+          <button class="settings-tab" data-section="core" type="button">Xray</button>
+          <button class="settings-tab" data-section="about" type="button">О программе</button>
+        </nav>
+
+        <div class="settings-section" data-section="app">
+          <section class="glass settings-card">
+            <div class="sec-title">Поведение приложения</div>
+            <label class="setting-row"><span><b>Запускать вместе с Windows</b><small>Открывать MarinBox при входе в систему</small></span><input id="settingStartup" type="checkbox"></label>
+            <label class="setting-row"><span><b>При закрытии окна</b><small>Включено — свернуть в трей; выключено — полностью выйти</small></span><input id="settingTray" type="checkbox"></label>
+            <label class="setting-row"><span><b>Автообновление подписок</b><small>Обновлять подписки при запуске</small></span><input id="settingRefresh" type="checkbox"></label>
+            <label class="setting-row"><span><b>Уведомления Windows</b><small>Сообщать о подключении, потере связи и обновлениях</small></span><input id="settingNotify" type="checkbox"></label>
+            <label class="setting-row"><span><b>Автообновление приложения</b><small>Проверять новую версию MarinBox при запуске и раз в 6 часов</small></span><input id="settingAutoUpdate" type="checkbox"></label>
+          </section>
+          <section class="glass settings-card">
+            <div class="sec-title">Оформление</div>
+            <div class="theme-options" role="radiogroup" aria-label="Тема">
+              <label class="theme-option"><input type="radio" name="theme" value="dark"><span><b>Тёмная</b><small>Как сейчас</small></span></label>
+              <label class="theme-option"><input type="radio" name="theme" value="light"><span><b>Светлая</b><small>Для светлого рабочего стола</small></span></label>
+              <label class="theme-option"><input type="radio" name="theme" value="system"><span><b>Как в системе</b><small>Следовать за темой Windows</small></span></label>
+            </div>
+            <label class="setting-row"><span><b>Цвет акцента</b><small>Используется в кнопках и графике</small></span><input id="settingAccent" class="color-setting" type="color" value="#35e6cf"></label>
+            <button class="ghost" id="btnResetAccent" type="button">Сбросить цвет</button>
+          </section>
+        </div>
+
+        <div class="settings-section" data-section="vpn" hidden>
+          <section class="glass settings-card">
+            <div class="sec-title">Надёжность VPN</div>
+            <label class="setting-row"><span><b>Проверять соединение</b><small>Проверка VPN-туннеля через прокси</small></span><input id="settingHealthCheck" type="checkbox"></label>
+            <label class="setting-row"><span><b>Интервал проверки, секунд</b><small>От 10 до 600 секунд</small></span><input id="settingHealthInterval" class="number-setting" type="number" min="10" max="600" step="5"></label>
+            <label class="setting-row"><span><b>Автопереподключение</b><small>Повторять попытки после потери связи</small></span><input id="settingAutoReconnect" type="checkbox"></label>
+            <label class="setting-row"><span><b>Число попыток</b><small>От 1 до 20 попыток</small></span><input id="settingReconnectAttempts" class="number-setting" type="number" min="1" max="20"></label>
+            <label class="setting-row"><span><b>Пауза между попытками, секунд</b><small>От 1 до 120 секунд</small></span><input id="settingReconnectDelay" class="number-setting" type="number" min="1" max="120"></label>
+          </section>
+          <section class="glass settings-card ping-settings">
+            <div class="sec-title">Тип пинга</div>
+            <div class="ping-options" role="radiogroup" aria-label="Тип пинга">
+              <label class="ping-option"><input type="radio" name="pingType" value="proxy-get"><span><b>через Proxy GET</b><small>Запрос через VPN-туннель до тестового HTTPS-сервера</small></span></label>
+              <label class="ping-option"><input type="radio" name="pingType" value="proxy-head"><span><b>через Proxy HEAD</b><small>Проверка через VPN без загрузки тела страницы</small></span></label>
+              <label class="ping-option"><input type="radio" name="pingType" value="tcp"><span><b>TCP</b><small>Время подключения к узлу выбранного сервера</small></span></label>
+              <label class="ping-option"><input type="radio" name="pingType" value="icmp"><span><b>ICMP</b><small>Системный ping до узлу выбранного сервера</small></span></label>
+            </div>
+          </section>
+          <section class="glass settings-card tun-card">
+            <div class="sec-title">TUN-режим</div>
+            <label class="setting-row"><span><b>Весь трафик через VPN</b><small>Приложения, которые игнорируют системный прокси, тоже пойдут в туннель</small></span><input id="settingTun" type="checkbox"></label>
+            <p class="muted">Нужны права администратора: при подключении Windows спросит разрешение (UAC) — это запускает Xray с Wintun. Системный прокси в этом режиме отключается, трафик идёт через TUN-интерфейс. Изменение режима переподключает VPN.</p>
+          </section>
+        </div>
+
+        <div class="settings-section" data-section="routes" hidden>
+          <section class="glass settings-card">
+            <div class="sec-title">Правила маршрутизации</div>
+            <p class="muted">Готовые наборы правил применяются при следующем подключении.</p>
+            <div id="routePresets" class="preset-list"></div>
+          </section>
+          <section class="glass settings-card">
+            <div class="sec-title">Свои исключения</div>
+            <label class="setting-row"><span><b>Домены напрямую</b><small>Через запятую или с новой строки; изменения применятся при следующем подключении</small></span><textarea id="settingBypassDomains" rows="3" placeholder="example.com"></textarea></label>
+            <label class="setting-row"><span><b>IP-адреса и CIDR напрямую</b><small>IPv4/IPv6; изменения применятся при следующем подключении</small></span><textarea id="settingBypassIps" rows="3" placeholder="192.0.2.10"></textarea></label>
+          </section>
+        </div>
+
+        <div class="settings-section" data-section="core" hidden>
+          <section class="glass settings-card">
+            <div class="sec-title">Ядро Xray</div>
+            <p class="muted">Установленная версия: <b id="xrayVersion">—</b></p>
+            <p id="xrayNotice" class="cabinet-notice" role="status" aria-live="polite"></p>
+            <div class="dlg-actions">
+              <button class="ghost" id="btnXrayCheck" type="button">Проверить обновления</button>
+              <div class="spacer"></div>
+              <button class="primary" id="btnXrayUpdate" type="button" hidden>Обновить ядро</button>
+            </div>
+            <p class="muted">Ядро скачивается с GitHub (XTLS/Xray-core) и хранится отдельно от приложения — установленную сборку это не ломает.</p>
+          </section>
+          <section class="glass settings-card">
+            <div class="sec-title">Журнал</div>
+            <label class="setting-row"><span><b>Уровень журнала Xray</b><small>Подробность записей в файле лога</small></span>
+              <select id="settingLogLevel">
+                <option value="none">Выключен</option><option value="error">Ошибки</option><option value="warning">Обычный</option><option value="info">Подробный</option><option value="debug">Отладка</option>
+              </select>
+            </label>
+            <button class="ghost" id="btnOpenLog">Открыть лог Xray</button>
+          </section>
+        </div>
+
+        <div class="settings-section" data-section="about" hidden>
+          <section class="glass settings-card update-card">
+            <div class="sec-title">Обновление</div>
+            <p class="muted">Установлена версия <b id="appVersion">—</b></p>
+            <p id="updateNotice" class="cabinet-notice" role="status" aria-live="polite"></p>
+            <div class="dlg-actions">
+              <button class="ghost" id="btnChangelog" type="button">Что нового</button>
+              <button class="ghost" id="btnCheckUpdate" type="button">Проверить обновления</button>
+              <div class="spacer"></div>
+              <button class="primary" id="btnDownloadUpdate" type="button" hidden>Скачать</button>
+              <button class="primary" id="btnInstallUpdate" type="button" hidden>Установить</button>
+            </div>
+          </section>
+          <section class="glass settings-card support-card">
+            <div class="sec-title">Поддержка</div>
+            <p class="muted">Помощь с подключением и подпиской — в Telegram.</p>
+            <a class="primary support-button" href="https://t.me/mar1n3x" target="_blank" rel="noreferrer">Написать в поддержку</a>
+            <a class="bot-link" href="https://t.me/marinvpnspeed_bot" target="_blank" rel="noreferrer">Telegram-бот ↗</a>
+          </section>
+          <button class="ghost reset-settings" id="btnResetSettings">Сбросить настройки</button>
+        </div>
       </div>
     </main>
 
