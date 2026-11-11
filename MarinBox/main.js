@@ -142,8 +142,9 @@ async function cabinetRequest(pathname, { method = 'GET', body } = {}) {
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
-    const detail = error?.message || String(error);
-    throw new Error(`Не удалось связаться с сервером MarinVPN: ${detail}`);
+    const detail = String(error?.message || error);
+    const text = /abort|timeout|timed out/i.test(detail) ? 'таймаут ответа' : detail;
+    throw new Error(`Не удалось связаться с сервером MarinVPN: ${text}`);
   }
   let data;
   try { data = await response.json(); } catch { data = {}; }
@@ -746,6 +747,15 @@ const handle = (ch, fn) => ipcMain.handle(ch, async (_e, ...a) => {
 function setupIpc() {
   handle('state:get', async () => publicState());
   handle('cabinet:login-start', async () => cabinetRequest('/api/desktop/login/start', { method: 'POST', body: {} }));
+  handle('cabinet:login-status', async (code) => {
+    const value = String(code || '').trim();
+    if (!/^\d{6}$/.test(value)) throw new Error('Некорректный код входа');
+    const res = await electronNet.fetch(`${CABINET_API}/api/desktop/login/status?code=${value}`, {
+      headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`Сервер ответил ${res.status}`);
+    return res.json();
+  });
   handle('cabinet:login-exchange', async (code) => {
     const result = await cabinetRequest('/api/desktop/login/exchange', { method: 'POST', body: { code: String(code || '').trim() } });
     if (!result.token) throw new Error('Сервер не вернул токен сессии');
