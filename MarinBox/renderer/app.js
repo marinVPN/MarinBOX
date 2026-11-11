@@ -459,6 +459,18 @@
     return true;
   }
 
+  // Обмен кода на токен кабинета
+  async function exchangeCabinetLogin() {
+    if (!cabinetCode) return false;
+    const result = await marin.cabinetLoginExchange(cabinetCode);
+    if (!result.ok) return false;
+    clearInterval(cabinetPollTimer);
+    cabinetCode = null;
+    renderCabinet(result.data);
+    cabinetNotice('Аккаунт подключён.', false);
+    return true;
+  }
+
   async function checkCabinetLogin() {
     if (!cabinetCode || cabinetPollBusy) return;
     if (Date.now() >= cabinetExpiresAt) {
@@ -470,17 +482,39 @@
     $('#cabinetCheck').disabled = true;
     cabinetNotice('Проверяем подтверждение в Telegram…');
     try {
-      const result = await marin.cabinetLoginExchange(cabinetCode);
-      if (result.ok) {
-        clearInterval(cabinetPollTimer);
-        cabinetCode = null;
-        renderCabinet(result.data);
-        cabinetNotice('Аккаунт подключён.', false);
-      } else {
-        cabinetNotice(/не найден|истёк|использован/i.test(result.error) ? 'Пока нет подтверждения. Отправьте код боту и попробуйте ещё раз.' : result.error, true);
+      const done = await exchangeCabinetLogin();
+      if (!done) {
+        cabinetNotice('Пока нет подтверждения. Подтвердите вход в Telegram и попробуйте ещё раз.', true);
         $('#cabinetCheck').disabled = Date.now() >= cabinetExpiresAt;
       }
     } finally { cabinetPollBusy = false; }
+  }
+
+  // Автоподтверждение: опрашиваем сервер, пока пользователь жмёт кнопку в Telegram
+  function startCabinetPolling() {
+    clearInterval(cabinetPollTimer);
+    cabinetPollTimer = setInterval(async () => {
+      if (!cabinetCode || cabinetPollBusy) return;
+      if (Date.now() >= cabinetExpiresAt) {
+        clearInterval(cabinetPollTimer);
+        $('#cabinetCheck').disabled = true;
+        cabinetNotice('Срок кода истёк. Запросите новый.', true);
+        return;
+      }
+      cabinetPollBusy = true;
+      try {
+        const status = await marin.cabinetLoginStatus(cabinetCode);
+        const state = status.ok ? status.data.state : 'pending';
+        if (state === 'confirmed') {
+          await exchangeCabinetLogin();
+        } else if (state === 'expired' || state === 'used') {
+          clearInterval(cabinetPollTimer);
+          $('#cabinetCheck').disabled = true;
+          cabinetNotice(state === 'used' ? 'Код уже использован.' : 'Срок кода истёк. Запросите новый.', true);
+        }
+      } catch { /* сеть моргнула — попробуем ещё */ }
+      finally { cabinetPollBusy = false; }
+    }, 2000);
   }
 
   // ───── действия ─────
@@ -541,15 +575,11 @@
     cabinetExpiresAt = Date.now() + Number(result.data.expires_in || 300) * 1000;
     $('#cabinetCode').textContent = cabinetCode;
     $('#cabinetCheck').disabled = false;
-    cabinetNotice('Отправьте боту команду /box ' + cabinetCode + '. Код действует 5 минут.');
-    clearInterval(cabinetPollTimer);
-    cabinetPollTimer = setInterval(() => {
-      if (Date.now() >= cabinetExpiresAt) {
-        clearInterval(cabinetPollTimer);
-        $('#cabinetCheck').disabled = true;
-        cabinetNotice('Срок кода истёк. Запросите новый.', true);
-      }
-    }, 1000);
+    const url = result.data.login_url || `https://t.me/marinvpnspeed_bot?start=box_${cabinetCode}`;
+    cabinetNotice('Откройте Telegram и подтвердите вход — приложение войдёт автоматически.');
+    startCabinetPolling();
+    const opened = await marin.openExternal(url);
+    if (!opened.ok) cabinetNotice('Откройте ссылку вручную: ' + url, true);
   };
   $('#cabinetCheck').onclick = checkCabinetLogin;
   document.querySelectorAll('[data-close-dialog]').forEach((button) => {
