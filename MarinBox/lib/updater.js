@@ -79,7 +79,8 @@ function githubManifest(data) {
   if (!version) throw new Error('В релизе GitHub не указан тег версии');
   const assets = Array.isArray(data.assets) ? data.assets : [];
   const exes = assets.filter((a) => /\.exe$/i.test(String(a.name || '')));
-  const installer = exes.find((a) => !/portable|blockmap/i.test(String(a.name || ''))) || exes[0];
+  // GitHub заменяет пробелы в имени вложения на точки: «MarinBox Setup 1.0.0.exe» -> «MarinBox.Setup.1.0.0.exe»
+  const installer = exes.find((a) => /setup/i.test(String(a.name || ''))) || exes[0];
   if (!installer) throw new Error('В релизе GitHub нет установщика .exe');
   const url = String(installer.browser_download_url || '');
   if (!url.startsWith('https://')) throw new Error('Некорректная ссылка на установщик в релизе');
