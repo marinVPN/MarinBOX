@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://cdnjs.cloudflare.com">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarinBox</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+
+  <div class="app">
+    <header class="titlebar">
+      <img class="logo" src="logo.png" alt="">
+      <div class="brand">Marin<b>Box</b></div>
+      <div class="spacer"></div>
+      <a class="support-link" href="https://t.me/mar1n3x" target="_blank" rel="noreferrer">Поддержка</a>
+      <button class="wbtn" id="btnMin" title="Свернуть">&#8211;</button>
+      <button class="wbtn" id="btnClose" title="В трей">&#10005;</button>
+    </header>
+
+    <nav class="nav" aria-label="Разделы">
+      <button class="nav-btn active" data-page="home">Главная</button>
+      <button class="nav-btn" data-page="cabinet">Кабинет</button>
+      <button class="nav-btn" data-page="settings">Настройки</button>
+    </nav>
+    <main>
+      <div class="page" id="page-home">
+      <section class="glass hero">
+        <button id="power" class="power" aria-label="Подключить / отключить">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>
+          </svg>
+        </button>
+        <div id="statusText" class="status">Отключено</div>
+        <div id="hint" class="hint">Добавьте подписку MarinVPN</div>
+        <div class="chips">
+          <span class="chip" id="timer">00:00:00</span>
+          <span class="chip" id="proxyInfo">Системный прокси</span>
+        </div>
+      </section>
+
+      <section class="glass sub" id="subCard" hidden></section>
+
+      <section class="glass servers">
+        <div class="sec-head">
+          <div class="sec-title">Серверы</div>
+          <button class="ghost" id="btnPing" title="Время TCP-подключения до узла сервера">Задержка</button>
+        </div>
+        <p class="latency-note">Проверяется доступность узла; это не пинг через VPN-туннель.</p>
+        <div id="list" class="list"></div>
+      </section>
+      </div>
+      <div class="page cabinet-page" id="page-cabinet" hidden>
+        <section class="glass cabinet-head">
+          <div class="cabinet-heading"><h1>Кабинет MarinVPN</h1><div class="cabinet-heading-row"><p id="cabinetSummary" class="muted">Управляйте аккаунтом, не покидая MarinBox.</p><button class="ghost cabinet-bot-link" id="cabinetBotLink" type="button">Перейти в бота</button></div></div>
+          <button class="ghost" id="cabinetRefresh" type="button">Обновить</button>
+        </section>
+        <section class="glass cabinet-connect" id="cabinetConnect">
+          <h2>Подключите Telegram-аккаунт</h2>
+          <p class="muted">Получите код, отправьте боту команду <b>/box КОД</b>, затем подтвердите вход здесь.</p>
+          <div class="cabinet-code-row"><button class="primary" id="cabinetGetCode" type="button">Получить код</button><output id="cabinetCode" class="cabinet-code" aria-live="polite">— — — — — —</output><button class="ghost" id="cabinetCheck" type="button" disabled>Я отправил код</button></div>
+          <p id="cabinetNotice" class="cabinet-notice" role="status" aria-live="polite">Код действует 5 минут.</p>
+        </section>
+        <section id="cabinetData" class="cabinet-data" hidden>
+          <div id="cabinetOverview" class="cabinet-overview"></div>
+          <section class="glass cabinet-section cabinet-actions">
+            <div class="sec-head"><h2 class="sec-title">Аккаунт</h2></div>
+            <div class="cabinet-action-grid"><button class="primary" data-cabinet="bonus">Забрать ежедневный бонус</button><button class="ghost" data-cabinet="trial">Получить пробный доступ</button><button class="ghost" data-cabinet="payments">История платежей</button><button class="ghost" data-cabinet="referral">Пригласить друга</button></div>
+            <div class="cabinet-topup"><label for="cabinetTopupAmount">Пополнить баланс</label><input id="cabinetTopupAmount" class="number-setting" type="number" min="1" max="10000" value="500"><button class="primary" data-cabinet="topup">Перейти к оплате</button></div>
+          </section>
+          <section class="glass cabinet-section">
+            <div class="sec-head"><h2 class="sec-title">Ключи и подписки</h2></div>
+            <div id="cabinetSubscriptions" class="cabinet-list"></div>
+          </section>
+          <section class="glass cabinet-section">
+            <div class="sec-head"><h2 class="sec-title">Покупка или продление</h2></div>
+            <p id="cabinetDiscountNotice" class="cabinet-discount-notice" aria-live="polite"></p>
+            <div class="cabinet-purchase-controls"><label>Тариф<select id="cabinetTariff"></select><small id="cabinetSelectedPrice" class="cabinet-selected-price"></small></label><label>Оплата<select id="cabinetPaymentMethod"><option value="platega">СБП / криптовалюта</option><option value="balance">С баланса</option></select></label><label class="cabinet-renew-control">Продлить ключ<select id="cabinetRenewSub"><option value="">Новый ключ</option></select></label></div>
+            <label class="cabinet-promo">Промокод<input id="cabinetPromoInput" maxlength="64" placeholder="Введите промокод"></label>
+            <div class="cabinet-action-grid"><button class="ghost" data-cabinet="promo">Применить промокод</button><button class="primary" data-cabinet="purchase">Оплатить выбранный тариф</button></div>
+            <p id="cabinetPromoNotice" class="cabinet-notice" aria-live="polite"></p>
+          </section>
+          <button class="ghost cabinet-logout" id="cabinetLogout" type="button">Отключить аккаунт</button>
+        </section>
+      </div>
+      <div class="page" id="page-settings" hidden>
+        <section class="glass settings-card">
+          <div class="sec-title">Поведение приложения</div>
+          <label class="setting-row"><span><b>Запускать вместе с Windows</b><small>Открывать MarinBox при входе в систему</small></span><input id="settingStartup" type="checkbox"></label>
+          <label class="setting-row"><span><b>При закрытии окна</b><small>Включено — свернуть в трей; выключено — полностью выйти</small></span><input id="settingTray" type="checkbox"></label>
+          <label class="setting-row"><span><b>Автообновление подписок</b><small>Обновлять подписки при запуске</small></span><input id="settingRefresh" type="checkbox"></label>
+          <label class="setting-row"><span><b>Уведомления Windows</b><small>Сообщать о подключении, потере связи и обновлениях</small></span><input id="settingNotify" type="checkbox"></label>
+          <label class="setting-row"><span><b>Автообновление приложения</b><small>Проверять новую версию MarinBox при запуске</small></span><input id="settingAutoUpdate" type="checkbox"></label>
+        </section>
+        <section class="glass settings-card ping-settings">
+          <div class="sec-title">Тип пинга</div>
+          <div class="ping-options" role="radiogroup" aria-label="Тип пинга">
+            <label class="ping-option"><input type="radio" name="pingType" value="proxy-get"><span><b>через Proxy GET</b><small>Запрос через VPN-туннель до тестового HTTPS-сервера</small></span></label>
+            <label class="ping-option"><input type="radio" name="pingType" value="proxy-head"><span><b>через Proxy HEAD</b><small>Проверка через VPN без загрузки тела страницы</small></span></label>
+            <label class="ping-option"><input type="radio" name="pingType" value="tcp"><span><b>TCP</b><small>Время подключения к узлу выбранного сервера</small></span></label>
+            <label class="ping-option"><input type="radio" name="pingType" value="icmp"><span><b>ICMP</b><small>Системный ping до узла выбранного сервера</small></span></label>
+          </div>
+        </section>
+        <section class="glass settings-card">
+          <div class="sec-title">Надёжность VPN</div>
+          <label class="setting-row"><span><b>Проверять соединение</b><small>Проверка VPN-туннеля через прокси</small></span><input id="settingHealthCheck" type="checkbox"></label>
+          <label class="setting-row"><span><b>Интервал проверки, секунд</b><small>От 10 до 600 секунд</small></span><input id="settingHealthInterval" class="number-setting" type="number" min="10" max="600" step="5"></label>
+          <label class="setting-row"><span><b>Автопереподключение</b><small>Повторять попытки после потери связи</small></span><input id="settingAutoReconnect" type="checkbox"></label>
+          <label class="setting-row"><span><b>Число попыток</b><small>От 1 до 20 попыток</small></span><input id="settingReconnectAttempts" class="number-setting" type="number" min="1" max="20"></label>
+          <label class="setting-row"><span><b>Пауза между попытками, секунд</b><small>От 1 до 120 секунд</small></span><input id="settingReconnectDelay" class="number-setting" type="number" min="1" max="120"></label>
+        </section>
+        <section class="glass settings-card">
+          <div class="sec-title">Xray и маршрутизация</div>
+          <label class="setting-row"><span><b>Уровень журнала Xray</b><small>Подробность записей в файле лога</small></span>
+            <select id="settingLogLevel">
+              <option value="none">Выключен</option><option value="error">Ошибки</option><option value="warning">Обычный</option><option value="info">Подробный</option><option value="debug">Отладка</option>
+            </select>
+          </label>
+          <label class="setting-row"><span><b>Домены напрямую</b><small>Через запятую или с новой строки; изменения применятся при следующем подключении</small></span><textarea id="settingBypassDomains" rows="3" placeholder="example.com"></textarea></label>
+          <label class="setting-row"><span><b>IP-адреса и CIDR напрямую</b><small>IPv4/IPv6; изменения применятся при следующем подключении</small></span><textarea id="settingBypassIps" rows="3" placeholder="192.0.2.10"></textarea></label>
+          <button class="ghost" id="btnOpenLog">Открыть лог Xray</button>
+        </section>
+        <section class="glass settings-card">
+          <div class="sec-title">Правила маршрутизации</div>
+          <p class="muted">Готовые наборы правил применяются при следующем подключении.</p>
+          <div id="routePresets" class="preset-list"></div>
+        </section>
+        <section class="glass settings-card tun-card">
+          <div class="sec-title">TUN-режим</div>
+          <label class="setting-row"><span><b>Весь трафик через VPN</b><small>Приложения, которые игнорируют системный прокси, тоже пойдут в туннель</small></span><input id="settingTun" type="checkbox"></label>
+          <p class="muted">Нужны права администратора: при подключении Windows спросит разрешение (UAC) — это запускает Xray с Wintun. Системный прокси в этом режиме отключается, трафик идёт через TUN-интерфейс. Изменение режима переподключает VPN.</p>
+        </section>
+        <section class="glass settings-card update-card">
+          <div class="sec-title">Обновление</div>
+          <p class="muted">Установлена версия <b id="appVersion">—</b></p>
+          <p id="updateNotice" class="cabinet-notice" role="status" aria-live="polite"></p>
+          <div class="dlg-actions">
+            <button class="ghost" id="btnChangelog" type="button">Что нового</button>
+            <button class="ghost" id="btnCheckUpdate" type="button">Проверить обновления</button>
+            <div class="spacer"></div>
+            <button class="primary" id="btnDownloadUpdate" type="button" hidden>Скачать</button>
+            <button class="primary" id="btnInstallUpdate" type="button" hidden>Установить</button>
+          </div>
+        </section>
+        <section class="glass settings-card support-card">
+          <div class="sec-title">Поддержка</div>
+          <p class="muted">Помощь с подключением и подпиской — в Telegram.</p>
+          <a class="primary support-button" href="https://t.me/mar1n3x" target="_blank" rel="noreferrer">Написать в поддержку</a>
+          <a class="bot-link" href="https://t.me/marinvpnspeed_bot" target="_blank" rel="noreferrer">Telegram-бот ↗</a>
+        </section>
+        <button class="ghost reset-settings" id="btnResetSettings">Сбросить настройки</button>
+      </div>
+    </main>
+
+    <button class="fab" id="btnAdd">+ Добавить</button>
+  </div>
+
+  <dialog id="cabinetPaymentsDialog" class="cabinet-dialog">
+    <div class="cabinet-dialog-head"><h3>История платежей</h3><button class="icon-btn" type="button" data-close-dialog="cabinetPaymentsDialog" aria-label="Закрыть">×</button></div>
+    <div id="cabinetPayments" class="cabinet-list"></div>
+  </dialog>
+  <dialog id="cabinetReferralDialog" class="cabinet-dialog">
+    <div class="cabinet-dialog-head"><h3>Пригласить друга</h3><button class="icon-btn" type="button" data-close-dialog="cabinetReferralDialog" aria-label="Закрыть">×</button></div>
+    <div id="cabinetReferral"></div>
+  </dialog>
+  <dialog id="cabinetRenameDialog" class="cabinet-dialog cabinet-rename-dialog">
+    <div class="cabinet-dialog-head"><h3>Переименовать ключ</h3><button class="icon-btn" type="button" data-close-dialog="cabinetRenameDialog" aria-label="Закрыть">×</button></div>
+    <label class="cabinet-rename-label" for="cabinetRenameInput">Название ключа</label>
+    <input id="cabinetRenameInput" class="cabinet-rename-input" type="text" maxlength="40" autocomplete="off">
+    <div class="dlg-actions"><button class="ghost" type="button" data-close-dialog="cabinetRenameDialog">Отмена</button><div class="spacer"></div><button id="cabinetRenameSave" class="primary" type="button">Сохранить</button></div>
+  </dialog>
+
+  <dialog id="changelogDialog" class="cabinet-dialog changelog-dialog">
+    <div class="cabinet-dialog-head"><h3>Что нового</h3><button class="icon-btn" type="button" data-close-dialog="changelogDialog" aria-label="Закрыть">×</button></div>
+    <p class="muted changelog-version" id="changelogVersion">—</p>
+    <div class="changelog-text" id="changelogText"></div>
+    <div class="dlg-actions">
+      <div class="spacer"></div>
+      <button class="primary" type="button" data-close-dialog="changelogDialog">Понятно</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg">
+    <h3>Добавить подписку или ключ</h3>
+    <p class="muted">Ссылка подписки (https://…) или ключ vless:// vmess:// trojan:// ss://. Можно вставить несколько ключей, по одному в строку.</p>
+    <textarea id="dlgText" rows="5" spellcheck="false" placeholder="https://sub.marinvpn.example/..."></textarea>
+    <div id="dlgLoading" class="dlg-loading" role="status" aria-live="polite" hidden>
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span>Загружаем подписку…</span>
+    </div>
+    <div class="dlg-actions">
+      <button class="ghost" id="dlgPaste">Из буфера</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="dlgCancel">Отмена</button>
+      <button class="primary" id="dlgOk">Добавить</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
