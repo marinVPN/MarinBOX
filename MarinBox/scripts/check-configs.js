@@ -27,6 +27,15 @@ const cases = [
   ['все пресеты', { routePresets: ['ru-direct', 'ads-block', 'trackers-block', 'porn-block', 'discord-direct', 'social-direct', 'youtube-direct', 'openai-direct'] }],
   ['TUN-режим', { routePresets: ['ru-direct'], tun: true }],
   ['свои исключения', { bypassDomains: ['example.com'], bypassIps: ['192.0.2.0/24'], routePresets: ['ads-block'] }],
+  ['правила по приложениям', { appRules: [{ process: 'Telegram.exe', mode: 'direct' }, { process: 'Steam.exe', mode: 'proxy' }] }],
+  ['категории из каталога', { categories: [{ name: 'CATEGORY-PORN', mode: 'block' }, { name: 'CATEGORY-RU', mode: 'direct' }] }],
+  ['DNS через DoH', { dnsPreset: 'cloudflare', dnsDoh: true }],
+  ['DNS + TUN + приложения + категории', {
+    tun: true, dnsPreset: 'google', dnsDoh: true,
+    appRules: [{ process: 'Telegram.exe', mode: 'direct' }],
+    categories: [{ name: 'CATEGORY-PORN', mode: 'block' }],
+    routePresets: ['ads-block'],
+  }],
 ];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'marinbox-cfg-'));
@@ -41,7 +50,7 @@ for (const [name, opts] of cases) {
   if (!ok) failed++;
   console.log(`${ok ? 'OK   ' : 'FAIL '} ${name}`);
   if (!ok) console.log('      ' + out.split(/\r?\n/).filter(Boolean).slice(-2).join('\n      '));
-  if (opts.routePresets.length) {
+  if (opts.routePresets && opts.routePresets.length) {
     console.log('      правила: ' + cfg.routing.rules.map((x) => `${JSON.stringify(x.domain || x.ip)} -> ${x.outboundTag}`).join(', '));
   }
 }
