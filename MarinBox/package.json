@@ -11,7 +11,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
+    "dist": "electron-builder --win --publish never",
     "fetch-xray": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-xray.ps1",
     "icon": "node scripts/make-icons.js",
     "test": "node scripts/selftest.js",
@@ -69,5 +69,9 @@
         ]
       }
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marinVPN/MarinBOX.git"
   }
 }
