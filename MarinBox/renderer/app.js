@@ -272,6 +272,128 @@
     b.onclick = () => showSettingsSection(b.dataset.section);
   });
 
+  // ───── правила по приложениям ─────
+  function renderAppRules() {
+    const box = $('#appRules');
+    if (!box) return;
+    box.replaceChildren();
+    const rules = S.settings?.appRules || [];
+    if (!rules.length) {
+      box.append(mk('div', 'empty-hint', 'Правил нет — все приложения идут по общему маршруту.'));
+      return;
+    }
+    for (const rule of rules) {
+      const item = mk('div', 'rule-item');
+      item.append(mk('span', 'rule-name', rule.process));
+      const select = document.createElement('select');
+      for (const [value, label] of [['direct', 'мимо VPN'], ['proxy', 'через VPN'], ['block', 'заблокировать']]) {
+        const opt = mk('option', null, label);
+        opt.value = value;
+        if (rule.mode === value) opt.selected = true;
+        select.append(opt);
+      }
+      select.onchange = () => {
+        S.settings.appRules = rules.map((r) => (r.process === rule.process ? { ...r, mode: select.value } : r));
+        saveSettings();
+      };
+      const del = mk('button', 'rule-del', '✕');
+      del.title = 'Удалить правило';
+      del.onclick = () => {
+        S.settings.appRules = rules.filter((r) => r.process !== rule.process);
+        renderAppRules();
+        saveSettings();
+      };
+      item.append(select, del);
+      box.append(item);
+    }
+  }
+  $('#btnAddAppRule').onclick = () => {
+    const input = $('#appRuleName');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    const rules = [...(S.settings?.appRules || [])];
+    if (rules.some((r) => r.process.toLowerCase() === name.toLowerCase())) { toast('Такое правило уже есть'); return; }
+    rules.push({ process: name, mode: $('#appRuleMode').value });
+    S.settings.appRules = rules;
+    input.value = '';
+    renderAppRules();
+    saveSettings();
+  };
+  $('#appRuleName').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); $('#btnAddAppRule').click(); }
+  });
+
+  // ───── каталог категорий geosite ─────
+  let CATEGORY_LIST = null;
+  let categoryFilter = '';
+  async function loadCategories() {
+    if (CATEGORY_LIST) return CATEGORY_LIST;
+    const r = await marin.routeCategories();
+    CATEGORY_LIST = r.ok ? (r.data || []) : [];
+    const hint = $('#categoryHint');
+    if (hint && CATEGORY_LIST.length) hint.textContent = `В базе geosite ${CATEGORY_LIST.length} категорий. Выберите, что блокировать или пускать напрямую.`;
+    return CATEGORY_LIST;
+  }
+  function renderCategories() {
+    const box = $('#categoryList');
+    if (!box) return;
+    box.replaceChildren();
+    const selected = new Map((S.settings?.categories || []).map((c) => [c.name, c.mode]));
+    const query = categoryFilter.trim().toLowerCase();
+    const list = (CATEGORY_LIST || []).filter((c) => !query
+      || c.title.toLowerCase().includes(query)
+      || c.name.toLowerCase().includes(query));
+    if (!list.length) {
+      box.append(mk('div', 'empty-hint', 'Ничего не найдено'));
+    }
+    for (const cat of list.slice(0, 300)) {
+      const row = mk('div', 'category-item');
+      row.append(mk('span', 'cat-title', cat.title));
+      row.append(mk('span', 'cat-count', `${cat.count}`));
+      const select = document.createElement('select');
+      for (const [value, label] of [['none', 'не трогать'], ['block', 'блокировать'], ['direct', 'напрямую']]) {
+        const opt = mk('option', null, label);
+        opt.value = value;
+        if ((selected.get(cat.name) || 'none') === value) opt.selected = true;
+        select.append(opt);
+      }
+      select.onchange = () => {
+        const current = (S.settings?.categories || []).filter((c) => c.name !== cat.name);
+        if (select.value !== 'none') current.push({ name: cat.name, mode: select.value });
+        S.settings.categories = current;
+        updateCategoryCount();
+        saveSettings();
+      };
+      row.append(select);
+      box.append(row);
+    }
+    if (list.length > 300) box.append(mk('div', 'empty-hint', `Показаны первые 300 из ${list.length}. Уточните поиск.`));
+    updateCategoryCount();
+  }
+  function updateCategoryCount() {
+    const el = $('#categorySelected');
+    if (!el) return;
+    const n = (S.settings?.categories || []).length;
+    el.textContent = n ? `Выбрано категорий: ${n}` : 'Выбрано: 0';
+  }
+  $('#categorySearch').addEventListener('input', (event) => {
+    categoryFilter = event.target.value || '';
+    renderCategories();
+  });
+
+  // ───── DNS ─────
+  function renderDns() {
+    const preset = ['system', 'cloudflare', 'google', 'quad9', 'yandex', 'custom'].includes(S.settings?.dnsPreset)
+      ? S.settings.dnsPreset : 'system';
+    $('#settingDnsPreset').value = preset;
+    $('#settingDnsCustom').value = S.settings?.dnsCustom || '';
+    $('#settingDnsDoh').checked = !!S.settings?.dnsDoh;
+    $('#settingDnsCustomRow').hidden = preset !== 'custom';
+  }
+
+  // ───── квик-виджет ─────
+  $('#btnShowWidget').onclick = () => marin.toggleWidget();
+
   function renderSettings() {
     const settings = { ...DEFAULT_SETTINGS, ...(S.settings || {}) };
     $('#settingStartup').checked = !!settings.startup;
@@ -306,6 +428,9 @@
     if (version) version.textContent = S.version || '—';
     showSettingsSection(settingsSection);
     renderPresets();
+    renderAppRules();
+    renderCategories();
+    renderDns();
   }
 
   // Чекбоксы пресетов маршрутизации
@@ -746,6 +871,11 @@
       notify: $('#settingNotify').checked,
       autoUpdate: $('#settingAutoUpdate').checked,
       tun: $('#settingTun').checked,
+      appRules: S.settings?.appRules || [],
+      categories: S.settings?.categories || [],
+      dnsPreset: $('#settingDnsPreset').value,
+      dnsCustom: $('#settingDnsCustom').value,
+      dnsDoh: $('#settingDnsDoh').checked,
       theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme,
       accent: $('#settingAccent').value,
       routePresets: Array.from(document.querySelectorAll('#routePresets input[type=checkbox]'))
@@ -765,7 +895,7 @@
       else toast('Настройки сохранены', false);
     });
   };
-  ['settingStartup', 'settingTray', 'settingRefresh', 'settingNotify', 'settingAutoUpdate', 'settingTun', 'settingHealthCheck', 'settingHealthInterval', 'settingAutoReconnect', 'settingReconnectAttempts', 'settingReconnectDelay', 'settingLogLevel', 'settingBypassDomains', 'settingBypassIps', 'settingAccent'].forEach((id) => {
+  ['settingStartup', 'settingTray', 'settingRefresh', 'settingNotify', 'settingAutoUpdate', 'settingTun', 'settingHealthCheck', 'settingHealthInterval', 'settingAutoReconnect', 'settingReconnectAttempts', 'settingReconnectDelay', 'settingLogLevel', 'settingBypassDomains', 'settingBypassIps', 'settingAccent', 'settingDnsPreset', 'settingDnsCustom', 'settingDnsDoh'].forEach((id) => {
     $('#' + id).onchange = saveSettings;
   });
   document.querySelectorAll('input[name="theme"]').forEach((input) => {
@@ -937,6 +1067,7 @@
   setInterval(tick, 1000);
   (async () => {
     await loadPresets();
+    await loadCategories();
     const r = await marin.state();
     if (r.ok) { apply(r.data); pingActive(); }
   })();
