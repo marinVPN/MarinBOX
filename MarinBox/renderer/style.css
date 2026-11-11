@@ -314,6 +314,8 @@ select { color: var(--text); background: #151d3e; border: 1px solid var(--stroke
 .cabinet-connect h2 { font-size: 17px; margin-bottom: 6px; }
 .cabinet-connect .muted { max-width: 600px; margin-bottom: 16px; }
 .cabinet-code-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.cabinet-manual { margin: 12px 0 8px !important; font-size: 12px; }
+:root[data-theme="light"] .cabinet-code { background: rgba(19, 26, 51, .05); }
 .cabinet-code { min-width: 184px; padding: 9px 12px; border: 1px solid var(--stroke); border-radius: 10px; background: rgba(0,0,0,.14); text-align: center; font: 600 18px/1.2 "Segoe UI", sans-serif; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
 .cabinet-notice { min-height: 18px; margin-top: 12px; color: var(--muted); font-size: 12px; white-space: pre-line; }
 .cabinet-notice.error { color: var(--bad); }
