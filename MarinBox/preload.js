@@ -3,7 +3,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const call = (ch) => (...a) => ipcRenderer.invoke(ch, ...a);
 
+// Тема и акцент передаются при запуске, чтобы применить их до первой отрисовки
+const arg = (name) => {
+  const hit = process.argv.find((a) => a.startsWith(`--marin-${name}=`));
+  return hit ? hit.slice(name.length + 9) : '';
+};
+
 contextBridge.exposeInMainWorld('marin', {
+  initialTheme: arg('theme') || 'dark',
+  initialAccent: arg('accent') || '',
   state: call('state:get'),
   cabinetLoginStart: call('cabinet:login-start'),
   cabinetLoginExchange: call('cabinet:login-exchange'),
@@ -24,6 +32,8 @@ contextBridge.exposeInMainWorld('marin', {
   openLog: call('log:open'),
   routePresets: call('route:presets'),
   changelog: call('changelog:get'),
+  xrayCheck: call('xray:check'),
+  xrayUpdate: call('xray:update'),
   checkUpdate: call('update:check'),
   downloadUpdate: call('update:download'),
   installUpdate: call('update:install'),
