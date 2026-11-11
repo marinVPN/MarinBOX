@@ -92,5 +92,11 @@ npm run release -- --github   # нужна переменная GITHUB_TOKEN
     done++;
     console.log(`  ${status}: MarinBox/${rel.split(path.sep).join('/')}`);
   }
+
+  // 3. Главная страница репозитория (лежит в MarinBox\docs\repo-README.md)
+  const readmeFile = path.join(root, 'docs', 'repo-README.md');
+  if (fs.existsSync(readmeFile)) {
+    console.log(`README.md — ${await putFile('README.md', fs.readFileSync(readmeFile))}`);
+  }
   console.log(`\nГотово: ${done} файлов в ${repo}.`);
 })().catch((e) => { console.error('ОШИБКА: ' + e.message); process.exit(1); });
