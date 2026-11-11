@@ -2,6 +2,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, net: electronNet, screen, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const tcp = require('net');
 const { spawn, execFileSync } = require('child_process');
@@ -10,11 +11,12 @@ const { pipeline } = require('stream/promises');
 const { parseSubscriptionBody } = require('./lib/parser');
 const { buildConfig } = require('./lib/xray-config');
 const { PRESETS } = require('./lib/route-presets');
+const xrayUpd = require('./lib/xray-updater');
 const updater = require('./lib/updater');
 const sysproxy = require('./lib/sysproxy');
 
 const PORTS = { socks: 10808, http: 10809 };
-const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
+const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], theme: 'dark', accent: '', pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
 let healthTimer = null;
 let reconnectTimer = null;
 let reconnectGeneration = 0;
@@ -288,9 +290,15 @@ async function pingServer(server, type) {
 }
 
 // ───────────── Xray ─────────────
-function xrayPath() {
+// Приоритет у версии, скачанной из приложения (userData\core\v<версия>),
+// вшитый в сборку бинарь — запасной вариант.
+function bundledXrayPath() {
   const base = app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, 'bin');
   return path.join(base, process.platform === 'win32' ? 'xray.exe' : 'xray');
+}
+function xrayPath() {
+  const user = xrayUpd.latestInstalledCore(app.getPath('userData'));
+  return user ? user.exe : bundledXrayPath();
 }
 const lastLine = () => xrayLog.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop() || '';
 
@@ -505,13 +513,18 @@ async function connect(id, { retry = false } = {}) {
 function showWin() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 
 function createWindow() {
+  const cfg = settings();
+  const theme = ['dark', 'light', 'system'].includes(cfg.theme) ? cfg.theme : 'dark';
+  const accent = /^#[0-9a-f]{6}$/i.test(String(cfg.accent || '')) ? cfg.accent : '';
   win = new BrowserWindow({
     width: 920, height: 760, minWidth: 760, minHeight: 640,
-    frame: false, backgroundColor: '#060a18', show: false, title: 'MarinBox',
+    frame: false, backgroundColor: theme === 'light' ? '#eef1fb' : '#060a18', show: false, title: 'MarinBox',
     icon: ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
+      // тема и акцент — до первой отрисовки, чтобы не было мигания
+      additionalArguments: [`--marin-theme=${theme}`, `--marin-accent=${accent}`],
     },
   });
   win.setMenu(null);
@@ -650,6 +663,81 @@ function scheduleUpdateChecks() {
   if (timer.unref) timer.unref();
 }
 
+// ───────────── обновление Xray-core ─────────────
+function xrayVersion(bin) {
+  try {
+    const out = execFileSync(bin, ['version'], { encoding: 'utf8', timeout: 15000, windowsHide: true });
+    return xrayUpd.versionFromOutput(out);
+  } catch { return ''; }
+}
+
+async function fetchXrayRelease() {
+  const res = await electronNet.fetch(xrayUpd.API_URL, {
+    headers: { Accept: 'application/vnd.github+json', 'User-Agent': `MarinBox/${updater.CURRENT_VERSION}` },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (res.status === 404) throw new Error('Релизы Xray-core не найдены');
+  if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
+  return xrayUpd.parseRelease(await res.json());
+}
+
+// Скачивает архив, распаковывает в userData\core\v<версия> и проверяет, что ядро запускается
+async function installXrayCore() {
+  const release = await fetchXrayRelease();
+  const userData = app.getPath('userData');
+  const exeName = process.platform === 'win32' ? 'xray.exe' : 'xray';
+  const dir = xrayUpd.coreDir(userData, release.version);
+  const target = path.join(dir, exeName);
+  if (fs.existsSync(target)) return { version: release.version, dir, already: true };
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xray-core-'));
+  const zip = path.join(tmp, 'xray.zip');
+  try {
+    const res = await electronNet.fetch(release.url, { signal: AbortSignal.timeout(900000) });
+    if (!res.ok) throw new Error(`Не удалось скачать Xray: HTTP ${res.status}`);
+    const total = Number(res.headers.get('content-length')) || release.size || 0;
+    let received = 0;
+    const counter = new Transform({
+      transform(chunk, _enc, cb) {
+        received += chunk.length;
+        send('update:progress', { received, total, what: 'xray' });
+        cb(null, chunk);
+      },
+    });
+    await pipeline(Readable.fromWeb(res.body), counter, fs.createWriteStream(zip));
+
+    const out = path.join(tmp, 'out');
+    fs.mkdirSync(out, { recursive: true });
+    if (process.platform === 'win32') {
+      execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+        `Expand-Archive -LiteralPath '${zip.replace(/'/g, "''")}' -DestinationPath '${out.replace(/'/g, "''")}' -Force`],
+      { timeout: 120000, windowsHide: true });
+    } else {
+      execFileSync('unzip', ['-o', zip, '-d', out], { timeout: 120000 });
+    }
+
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of [exeName, 'geoip.dat', 'geosite.dat']) {
+      const src = path.join(out, name);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, name));
+    }
+    if (!fs.existsSync(target)) throw new Error('В архиве нет исполняемого файла xray');
+    const version = xrayVersion(target);
+    if (!version) throw new Error('Скачанное ядро не запускается');
+    return { version, dir };
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+}
+
+// Оставляем только две последние версии ядра
+function pruneOldCores(keep = 2) {
+  const list = xrayUpd.listInstalledCores(app.getPath('userData'));
+  for (const old of list.slice(keep)) {
+    try { fs.rmSync(old.dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+}
+
 // ───────────── IPC ─────────────
 const handle = (ch, fn) => ipcMain.handle(ch, async (_e, ...a) => {
   try { return { ok: true, data: await fn(...a) }; } catch (e) { return { ok: false, error: e.message || String(e) }; }
@@ -722,6 +810,8 @@ function setupIpc() {
       notify: settings?.notify !== false,
       autoUpdate: settings?.autoUpdate !== false,
       tun: !!settings?.tun,
+      theme: ['dark', 'light', 'system'].includes(settings?.theme) ? settings.theme : 'dark',
+      accent: /^#[0-9a-f]{6}$/i.test(String(settings?.accent || '')) ? String(settings.accent).toLowerCase() : '',
       routePresets: Array.isArray(settings?.routePresets)
         ? settings.routePresets.filter((id) => PRESET_IDS.has(id)).slice(0, PRESET_IDS.size)
         : [],
@@ -776,6 +866,23 @@ function setupIpc() {
     return true;
   });
   handle('route:presets', async () => PRESETS.map(({ id, label, hint }) => ({ id, label, hint })));
+  handle('xray:check', async () => {
+    const current = xrayVersion(xrayPath());
+    const release = await fetchXrayRelease();
+    const hasUpdate = updater.compareVersions(release.version, current) > 0;
+    return { current, latest: release.version, hasUpdate, notes: release.notes, size: release.size };
+  });
+  handle('xray:update', async () => {
+    const result = await installXrayCore();
+    pruneOldCores();
+    // если VPN был подключён — перезапускаем с новым ядром
+    if (status.state === 'connected') {
+      const id = status.serverId || store.selectedId;
+      await disconnect();
+      await connect(id).catch((e) => send('toast', e.message));
+    }
+    return result;
+  });
   handle('changelog:get', async () => {
     const current = updater.CURRENT_VERSION;
     // Сначала локальный CHANGELOG.md — он есть в приложении, поэтому окно открывается мгновенно
