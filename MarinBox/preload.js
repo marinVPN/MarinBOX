@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('marin', {
   initialAccent: arg('accent') || '',
   state: call('state:get'),
   cabinetLoginStart: call('cabinet:login-start'),
+  cabinetLoginStatus: call('cabinet:login-status'),
   cabinetLoginExchange: call('cabinet:login-exchange'),
   cabinet: call('cabinet:get'),
   cabinetAction: call('cabinet:action'),
