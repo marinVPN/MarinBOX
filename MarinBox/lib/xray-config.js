@@ -2,6 +2,28 @@
 
 const { selectedRules } = require('./route-presets');
 
+// Пресеты DNS: серверы и режим (обычный / DoH)
+const DNS_PRESETS = {
+  system: null,
+  cloudflare: { servers: ['1.1.1.1', '1.0.0.1'], doh: ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'] },
+  google: { servers: ['8.8.8.8', '8.4.4.4'], doh: ['https://dns.google/dns-query', 'https://dns.googleapis.com/dns-query'] },
+  quad9: { servers: ['9.9.9.9', '149.112.112.112'], doh: ['https://dns.quad9.net/dns-query'] },
+  yandex: { servers: ['77.88.8.8', '77.88.8.1'], doh: ['https://common.dot.dns.yandex.net/dns-query'] },
+};
+
+function dnsServersFor(preset, custom) {
+  const list = [];
+  if (preset === 'custom') {
+    for (const s of String(custom || '').split(/[\s,;]+/)) {
+      const v = s.trim();
+      if (v) list.push(v);
+    }
+  } else if (DNS_PRESETS[preset]) {
+    list.push(...DNS_PRESETS[preset].servers);
+  }
+  return [...new Set(list)];
+}
+
 function streamSettings(p) {
   const net = p.network === 'h2' ? 'http' : (p.network || 'tcp');
   const ss = { network: net, security: p.security || 'none' };
@@ -96,41 +118,83 @@ function buildTunInbound(sniffing) {
 
 function buildConfig(server, {
   socksPort = 10808, httpPort = 10809, logLevel = 'warning', logPath, bypassDomains = [], bypassIps = [],
-  routePresets = [], tun = false,
+  routePresets = [], tun = false, appRules = [], categories = [],
+  dnsPreset = 'system', dnsCustom = '', dnsDoh = false,
 } = {}) {
   const sniffing = { enabled: true, destOverride: ['http', 'tls', 'quic'] };
   const rules = [];
+
+  // 1. Правила по приложениям — самое специфичное, поэтому первыми
+  for (const item of Array.isArray(appRules) ? appRules : []) {
+    const process = String(item.process || '').trim();
+    if (!process) continue;
+    const tag = item.mode === 'direct' ? 'direct' : item.mode === 'block' ? 'block' : 'proxy';
+    rules.push({ type: 'field', process: [process], outboundTag: tag });
+  }
+
+  // 2. DNS-запросы — в модуль DNS Xray (если включено)
+  const dnsServers = dnsServersFor(dnsPreset, dnsCustom);
+  const useDnsModule = dnsDoh && dnsServers.length > 0;
+  if (useDnsModule) rules.push({ type: 'field', port: 53, outboundTag: 'dns-out' });
+
+  // 3. Свои исключения
   if (bypassDomains.length) rules.push({ type: 'field', domain: bypassDomains.map((domain) => `domain:${domain}`), outboundTag: 'direct' });
   if (bypassIps.length) rules.push({ type: 'field', ip: bypassIps, outboundTag: 'direct' });
+
+  // 4. Готовые пресеты
   for (const preset of selectedRules(routePresets)) {
     const rule = { type: 'field', outboundTag: preset.outboundTag };
     if (preset.domain && preset.domain.length) rule.domain = preset.domain;
     if (preset.ip && preset.ip.length) rule.ip = preset.ip;
     rules.push(rule);
   }
+
+  // 5. Категории из каталога geosite: сначала блокировки, потом «напрямую»
+  const cats = Array.isArray(categories) ? categories : [];
+  const catBlock = cats.filter((c) => c.mode === 'block').map((c) => `geosite:${c.name}`);
+  const catDirect = cats.filter((c) => c.mode === 'direct').map((c) => `geosite:${c.name}`);
+  if (catBlock.length) rules.push({ type: 'field', domain: catBlock, outboundTag: 'block' });
+  if (catDirect.length) rules.push({ type: 'field', domain: catDirect, outboundTag: 'direct' });
+
   rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+
   const inbounds = [
     { tag: 'socks', listen: '127.0.0.1', port: socksPort, protocol: 'socks',
       settings: { udp: true, auth: 'noauth' }, sniffing },
     { tag: 'http', listen: '127.0.0.1', port: httpPort, protocol: 'http', sniffing },
   ];
-  if (tun) inbounds.unshift(buildTunInbound(sniffing));
-  return {
+  if (tun) {
+    const inbound = buildTunInbound(sniffing);
+    if (dnsServers.length) inbound.settings.dns = dnsServers;
+    if (useDnsModule) inbound.settings.autoSystemWfpBlockLeak = ['dns', 'misconfigtun'];
+    inbounds.unshift(inbound);
+  }
+  const outbounds = [
+    buildOutbound(server),
+    { tag: 'direct', protocol: 'freedom' },
+    { tag: 'block', protocol: 'blackhole' },
+  ];
+  const config = {
     log: {
       loglevel: ['debug', 'info', 'warning', 'error', 'none'].includes(logLevel) ? logLevel : 'warning',
       error: logPath,
     },
     inbounds,
-    outbounds: [
-      buildOutbound(server),
-      { tag: 'direct', protocol: 'freedom' },
-      { tag: 'block', protocol: 'blackhole' },
-    ],
+    outbounds,
     routing: {
       domainStrategy: 'IPIfNonMatch',
       rules,
     },
   };
+  if (useDnsModule) {
+    const preset = DNS_PRESETS[dnsPreset];
+    const servers = dnsPreset === 'custom'
+      ? (dnsServers.find((s) => s.includes('://')) ? dnsServers : dnsServers.map((s) => `https://${s}/dns-query`))
+      : (preset && preset.doh ? preset.doh : dnsServers.map((s) => `https://${s}/dns-query`));
+    config.dns = { servers, queryStrategy: 'UseIP' };
+    outbounds.push({ tag: 'dns-out', protocol: 'dns' });
+  }
+  return config;
 }
 
-module.exports = { buildConfig, buildOutbound, buildTunInbound };
+module.exports = { buildConfig, buildOutbound, buildTunInbound, DNS_PRESETS, dnsServersFor };
