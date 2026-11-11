@@ -59,8 +59,13 @@
         </section>
         <section class="glass cabinet-connect" id="cabinetConnect">
           <h2>Подключите Telegram-аккаунт</h2>
-          <p class="muted">Получите код, отправьте боту команду <b>/box КОД</b>, затем подтвердите вход здесь.</p>
-          <div class="cabinet-code-row"><button class="primary" id="cabinetGetCode" type="button">Получить код</button><output id="cabinetCode" class="cabinet-code" aria-live="polite">— — — — — —</output><button class="ghost" id="cabinetCheck" type="button" disabled>Я отправил код</button></div>
+          <p class="muted">Нажмите кнопку — Telegram подтвердит вход, приложение войдёт само.</p>
+          <div class="cabinet-code-row">
+            <button class="primary" id="cabinetGetCode" type="button">Войти через Telegram</button>
+            <output id="cabinetCode" class="cabinet-code" aria-live="polite">— — — — — —</output>
+          </div>
+          <p class="muted cabinet-manual">Если кнопка не помогла, отправьте боту команду <b>/box КОД</b> и нажмите «Я отправил код».</p>
+          <div class="cabinet-code-row"><button class="ghost" id="cabinetCheck" type="button" disabled>Я отправил код</button></div>
           <p id="cabinetNotice" class="cabinet-notice" role="status" aria-live="polite">Код действует 5 минут.</p>
         </section>
         <section id="cabinetData" class="cabinet-data" hidden>
