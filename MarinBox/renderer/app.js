@@ -11,7 +11,7 @@
 
   let S = { subs: [], selectedId: null, settings: {} };
   let V = { state: 'disconnected', since: null, serverId: null, error: null };
-  const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
+  const DEFAULT_SETTINGS = { startup: false, tray: true, refresh: true, notify: true, autoUpdate: true, tun: false, routePresets: [], theme: 'dark', accent: '', pingType: 'proxy-get', healthCheck: true, healthInterval: 30, autoReconnect: true, reconnectAttempts: 5, reconnectDelay: 5, logLevel: 'warning', bypassDomains: '', bypassIps: '' };
   let activeSub = null;
   const pings = {};
   let pingPending = false;
@@ -238,6 +238,40 @@
     }
   }
 
+  // ───── тема и акцент ─────
+  const prefersLight = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  function applyTheme(theme, accent) {
+    const value = theme === 'system' ? (prefersLight() ? 'light' : 'dark') : (theme === 'light' ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', value);
+    if (accent && /^#[0-9a-f]{6}$/i.test(accent)) {
+      document.documentElement.style.setProperty('--accent', accent);
+      document.documentElement.style.setProperty('--accent2', accent);
+    } else {
+      document.documentElement.style.removeProperty('--accent');
+      document.documentElement.style.removeProperty('--accent2');
+    }
+  }
+  applyTheme(marin.initialTheme || 'dark', marin.initialAccent || '');
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onScheme = () => {
+      if ((S.settings?.theme || 'dark') === 'system') applyTheme('system', S.settings?.accent || '');
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onScheme);
+    else if (mq.addListener) mq.addListener(onScheme);
+  }
+
+  // ───── разделы настроек ─────
+  let settingsSection = 'app';
+  function showSettingsSection(name) {
+    settingsSection = name;
+    document.querySelectorAll('#settingsTabs .settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.section === name));
+    document.querySelectorAll('#page-settings .settings-section').forEach((s) => { s.hidden = s.dataset.section !== name; });
+  }
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach((b) => {
+    b.onclick = () => showSettingsSection(b.dataset.section);
+  });
+
   function renderSettings() {
     const settings = { ...DEFAULT_SETTINGS, ...(S.settings || {}) };
     $('#settingStartup').checked = !!settings.startup;
@@ -263,8 +297,14 @@
       icmp: 'Измеряется системный ICMP ping до узла сервера; маршрут может отличаться от VPN-туннеля.',
     };
     $('.latency-note').textContent = notes[pingType];
+    const theme = ['dark', 'light', 'system'].includes(settings.theme) ? settings.theme : 'dark';
+    const themeRadio = document.querySelector(`input[name="theme"][value="${theme}"]`);
+    if (themeRadio) themeRadio.checked = true;
+    $('#settingAccent').value = settings.accent || '#35e6cf';
+    applyTheme(theme, settings.accent || '');
     const version = $('#appVersion');
     if (version) version.textContent = S.version || '—';
+    showSettingsSection(settingsSection);
     renderPresets();
   }
 
@@ -676,6 +716,8 @@
       notify: $('#settingNotify').checked,
       autoUpdate: $('#settingAutoUpdate').checked,
       tun: $('#settingTun').checked,
+      theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme,
+      accent: $('#settingAccent').value,
       routePresets: Array.from(document.querySelectorAll('#routePresets input[type=checkbox]'))
         .filter((i) => i.checked).map((i) => i.dataset.preset),
       pingType: document.querySelector('input[name="pingType"]:checked')?.value || DEFAULT_SETTINGS.pingType,
@@ -693,9 +735,20 @@
       else toast('Настройки сохранены', false);
     });
   };
-  ['settingStartup', 'settingTray', 'settingRefresh', 'settingNotify', 'settingAutoUpdate', 'settingTun', 'settingHealthCheck', 'settingHealthInterval', 'settingAutoReconnect', 'settingReconnectAttempts', 'settingReconnectDelay', 'settingLogLevel', 'settingBypassDomains', 'settingBypassIps'].forEach((id) => {
+  ['settingStartup', 'settingTray', 'settingRefresh', 'settingNotify', 'settingAutoUpdate', 'settingTun', 'settingHealthCheck', 'settingHealthInterval', 'settingAutoReconnect', 'settingReconnectAttempts', 'settingReconnectDelay', 'settingLogLevel', 'settingBypassDomains', 'settingBypassIps', 'settingAccent'].forEach((id) => {
     $('#' + id).onchange = saveSettings;
   });
+  document.querySelectorAll('input[name="theme"]').forEach((input) => {
+    input.onchange = () => {
+      applyTheme(input.value, $('#settingAccent').value);
+      saveSettings();
+    };
+  });
+  $('#btnResetAccent').onclick = () => {
+    $('#settingAccent').value = '#35e6cf';
+    applyTheme(document.querySelector('input[name="theme"]:checked')?.value || 'dark', '');
+    saveSettings();
+  };
   $('#btnOpenLog').onclick = async () => {
     const r = await marin.openLog();
     if (!r.ok) toast(r.error);
@@ -741,6 +794,49 @@
       setAddLoading(false);
     }
   };
+
+  // ───── ядро Xray ─────
+  const xrayNotice = (text, bad) => {
+    const n = $('#xrayNotice');
+    if (!n) return;
+    n.textContent = text;
+    n.classList.toggle('error', !!bad);
+  };
+  const setXrayVersion = (value) => {
+    const el = $('#xrayVersion');
+    if (el) el.textContent = value || '—';
+  };
+  $('#btnXrayCheck').onclick = async () => {
+    const btn = $('#btnXrayCheck');
+    btn.disabled = true;
+    xrayNotice('Проверяем новые версии Xray…', false);
+    try {
+      const r = await marin.xrayCheck();
+      if (!r.ok) { xrayNotice(r.error, true); return; }
+      const info = r.data;
+      setXrayVersion(info.current || '—');
+      if (!info.hasUpdate) { xrayNotice('Установлена свежая версия ядра', false); return; }
+      xrayNotice(`Доступна версия ${info.latest}`, false);
+      $('#btnXrayUpdate').hidden = false;
+    } finally { btn.disabled = false; }
+  };
+  $('#btnXrayUpdate').onclick = async () => {
+    const btn = $('#btnXrayUpdate');
+    btn.disabled = true;
+    xrayNotice('Скачиваем ядро…', false);
+    try {
+      const r = await marin.xrayUpdate();
+      if (!r.ok) { xrayNotice(r.error, true); return; }
+      setXrayVersion(r.data.version);
+      xrayNotice(`Ядро обновлено до ${r.data.version}`, false);
+      $('#btnXrayUpdate').hidden = true;
+    } finally { btn.disabled = false; }
+  };
+  marin.onUpdateProgress(({ received, total, what }) => {
+    if (what !== 'xray') return;
+    if (total) xrayNotice(`Скачиваем ядро… ${Math.round((received / total) * 100)}%`, false);
+    else xrayNotice(`Скачано ${fmtBytes(received)}`, false);
+  });
 
   // ───── обновление приложения ─────
   const updateState = { manifest: null, file: null };
