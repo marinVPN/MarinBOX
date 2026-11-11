@@ -1,0 +1,73 @@
+{
+  "name": "marinbox",
+  "version": "1.0.0",
+  "description": "MarinBox — клиент MarinVPN для Windows",
+  "main": "main.js",
+  "author": "MarinVPN",
+  "license": "UNLICENSED",
+  "marinbox": {
+    "updateSource": "github",
+    "githubRepo": "marinVPN/MarinBOX"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "fetch-xray": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-xray.ps1",
+    "icon": "node scripts/make-icons.js",
+    "test": "node scripts/selftest.js",
+    "check:config": "node scripts/check-configs.js",
+    "release": "node scripts/release.js"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.marinvpn.marinbox",
+    "productName": "MarinBox",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "renderer/**",
+      "build/icon.png",
+      "build/tray@2x.png",
+      "CHANGELOG.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "MarinBox"
+    },
+    "protocols": [
+      {
+        "name": "MarinBox",
+        "schemes": [
+          "marinbox"
+        ]
+      }
+    ]
+  }
+}
