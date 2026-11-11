@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>MarinBox Widget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="widget-body">
+  <div class="widget">
+    <div class="widget-head">
+      <img class="widget-logo" src="logo.png" alt="">
+      <span class="widget-title">MarinBox</span>
+      <button class="widget-close" id="widgetClose" title="Скрыть виджет">×</button>
+    </div>
+    <button class="widget-power" id="widgetPower" title="Подключить / отключить">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>
+      </svg>
+    </button>
+    <div class="widget-state" id="widgetState">Отключено</div>
+    <div class="widget-server" id="widgetServer">—</div>
+  </div>
+  <script src="widget.js"></script>
+</body>
+</html>
