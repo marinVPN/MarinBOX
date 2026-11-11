@@ -37,10 +37,12 @@ function sha256(file) {
 // npm через node: на Windows .cmd нельзя запускать без shell (защита Node 20+)
 function npmRun(args) {
   const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  // npm_lifecycle_event=release заставил бы electron-builder публиковать самому
+  const env = { ...process.env, npm_lifecycle_event: 'dist' };
   if (fs.existsSync(npmCli)) {
-    return spawnSync(process.execPath, [npmCli, ...args], { stdio: 'inherit', cwd: root });
+    return spawnSync(process.execPath, [npmCli, ...args], { stdio: 'inherit', cwd: root, env });
   }
-  return spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, { stdio: 'inherit', cwd: root, shell: process.platform === 'win32' });
+  return spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, { stdio: 'inherit', cwd: root, shell: process.platform === 'win32', env });
 }
 
 function run(cmd, cmdArgs) {
@@ -81,11 +83,12 @@ async function githubPublish({ repo, token, notes, file, fileName }) {
     release = await create.json();
   }
 
-  // старый asset с тем же именем удаляем, чтобы не плодить дубли
-  const stale = (release.assets || []).find((a) => a.name === fileName);
-  if (stale) {
-    const del = await fetch(`https://api.github.com/repos/${repo}/releases/assets/${stale.id}`, { method: 'DELETE', headers });
-    console.log(del.ok ? `Удалён старый файл ${fileName}.` : `Не удалось удалить старый ${fileName} (${del.status})`);
+  // Старые установщики удаляем: GitHub переименовывает «MarinBox Setup X.exe» в «MarinBox.Setup.X.exe»,
+  // поэтому сверяемся по расширению, а не по точному имени.
+  const stale = (release.assets || []).filter((a) => /\.exe$/i.test(String(a.name || '')));
+  for (const asset of stale) {
+    const del = await fetch(`https://api.github.com/repos/${repo}/releases/assets/${asset.id}`, { method: 'DELETE', headers });
+    console.log(del.ok ? `Удалён старый файл ${asset.name}.` : `Не удалось удалить старый ${asset.name} (${del.status})`);
   }
 
   const uploadUrl = String(release.upload_url || '').replace('{?name,label}', '');
