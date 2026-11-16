@@ -275,6 +275,30 @@ function flatMark(size, c1 = [109, 1, 212], c2 = [153, 40, 255]) {
   return { width: size, height: size, data };
 }
 
+// Значок трея: тот же знак, но с индикатором состояния (точка в углу)
+function trayMark(size, variant) {
+  const img = flatMark(size);
+  const dot = { on: [53, 230, 160], off: [140, 155, 196], err: [255, 92, 122] }[variant] || [140, 155, 196];
+  const r = Math.max(2, Math.round(size * 0.19));
+  const cx = size - r - Math.max(1, Math.round(size * 0.04));
+  const cy = size - r - Math.max(1, Math.round(size * 0.04));
+  // точка с тёмной обводкой, чтобы читалась на любом фоне
+  for (let y = Math.max(0, cy - r - 1); y < Math.min(size, cy + r + 2); y++) {
+    for (let x = Math.max(0, cx - r - 1); x < Math.min(size, cx + r + 2); x++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      const o = (y * size + x) * 4;
+      if (d <= r) {
+        img.data[o] = dot[0]; img.data[o + 1] = dot[1]; img.data[o + 2] = dot[2]; img.data[o + 3] = 255;
+      } else if (d <= r + 1.2) {
+        const a = Math.max(0, 1 - (d - r)) * 220;
+        img.data[o] = 10; img.data[o + 1] = 14; img.data[o + 2] = 30;
+        img.data[o + 3] = Math.max(img.data[o + 3], a);
+      }
+    }
+  }
+  return img;
+}
+
 // ------------------------------------------------------------------ main
 
 function main() {
@@ -302,6 +326,11 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'renderer', 'logo.png'), encodePNG(flatMark(256)));
   fs.writeFileSync(path.join(ROOT, 'build', 'tray.png'), encodePNG(flatMark(32)));
   fs.writeFileSync(path.join(ROOT, 'build', 'tray@2x.png'), encodePNG(flatMark(64)));
+  // Значки трея по состоянию (точка-индикатор в углу)
+  for (const variant of ['off', 'on', 'err']) {
+    fs.writeFileSync(path.join(ROOT, 'build', `tray-${variant}.png`), encodePNG(trayMark(32, variant)));
+    fs.writeFileSync(path.join(ROOT, 'build', `tray-${variant}@2x.png`), encodePNG(trayMark(64, variant)));
+  }
 
   console.log('Готово:');
   console.log('  build\\icon.ico        ' + SMALL.concat(LARGE).join(', '));
