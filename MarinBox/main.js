@@ -13,6 +13,7 @@ const { buildConfig } = require('./lib/xray-config');
 const { PRESETS } = require('./lib/route-presets');
 const xrayUpd = require('./lib/xray-updater');
 const geositeCatalog = require('./lib/geosite-catalog');
+const xrayStats = require('./lib/xray-stats');
 const updater = require('./lib/updater');
 const sysproxy = require('./lib/sysproxy');
 
@@ -296,6 +297,49 @@ async function pingServer(server, type) {
   return tcpPing(server.host, server.port);
 }
 
+// ───────────── живая статистика Xray ─────────────
+let statsTimer = null;
+let statsPort = 0;
+let lastStats = { up: 0, down: 0, at: 0 };
+
+function freeLocalPort() {
+  return new Promise((resolve) => {
+    const srv = tcp.createServer();
+    srv.on('error', () => resolve(0));
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+function stopStatsPolling() {
+  if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
+}
+
+function startStatsPolling() {
+  stopStatsPolling();
+  if (!statsPort) return;
+  lastStats = { up: 0, down: 0, at: Date.now() };
+  statsTimer = setInterval(async () => {
+    try {
+      const map = await xrayStats.queryStats([
+        'outbound>>>proxy>>>traffic>>>uplink',
+        'outbound>>>proxy>>>traffic>>>downlink',
+      ], { port: statsPort });
+      const up = map['outbound>>>proxy>>>traffic>>>uplink'] || 0;
+      const down = map['outbound>>>proxy>>>traffic>>>downlink'] || 0;
+      const now = Date.now();
+      const dt = Math.max(0.5, (now - lastStats.at) / 1000);
+      const speedUp = Math.max(0, (up - lastStats.up) / dt);
+      const speedDown = Math.max(0, (down - lastStats.down) / dt);
+      lastStats = { up, down, at: now };
+      send('stats:update', { up, down, speedUp, speedDown, at: now });
+    } catch { /* API недоступна — молча пропускаем */ }
+  }, 2000);
+  if (statsTimer.unref) statsTimer.unref();
+}
+
 // ───────────── Xray ─────────────
 // Приоритет у версии, скачанной из приложения (userData\core\v<версия>),
 // вшитый в сборку бинарь — запасной вариант.
@@ -471,6 +515,7 @@ function setStatus(patch) {
 
 async function disconnect({ preserveReconnect = false } = {}) {
   stopHealthMonitor();
+  stopStatsPolling();
   if (!preserveReconnect) cancelReconnect();
   setStatus({ state: 'disconnected', since: null, error: null });
   sysproxy.disableSync();
@@ -485,11 +530,12 @@ async function connect(id, { retry = false } = {}) {
   const server = findServer(id);
   if (!server) throw new Error('Сервер не найден');
   if (xray || elevated || status.state === 'connected') await disconnect({ preserveReconnect: retry });
-  setStatus({ state: 'connecting', serverId: id, error: null });
+  setStatus({ state: 'connecting', serverId: id, error: null, stage: 'core' });
   try {
     const bin = xrayPath();
     if (!fs.existsSync(bin)) throw new Error('Не найден xray — запустите «npm run fetch-xray» (см. README)');
     const cfg = settings();
+    statsPort = await freeLocalPort();
     const domains = String(cfg.bypassDomains || '').split(/[\s,;]+/).map((x) => x.trim().replace(/^\./, '')).filter((x) => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/i.test(x));
     const ips = String(cfg.bypassIps || '').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?$|^[0-9a-f:]+(?:\/\d{1,3})?$/i.test(x));
     fs.writeFileSync(cfgPath(), JSON.stringify(buildConfig(server, {
@@ -497,7 +543,9 @@ async function connect(id, { retry = false } = {}) {
       routePresets: cfg.routePresets || [], tun: !!cfg.tun,
       appRules: cfg.appRules || [], categories: cfg.categories || [],
       dnsPreset: cfg.dnsPreset || 'system', dnsCustom: cfg.dnsCustom || '', dnsDoh: !!cfg.dnsDoh,
+      statsPort,
     }), null, 2));
+    setStatus({ stage: 'proxy' });
     if (cfg.tun) {
       // TUN: xray elevated, весь трафик системы в туннеле — системный прокси не нужен
       await startXrayElevated(bin, cfgPath());
@@ -506,9 +554,11 @@ async function connect(id, { retry = false } = {}) {
       await startXray(bin, cfgPath());
       await sysproxy.enable(PROXY_STR);
     }
+    setStatus({ stage: 'dns' });
     cancelReconnect();
-    setStatus({ state: 'connected', since: Date.now(), serverId: id, error: null });
+    setStatus({ state: 'connected', since: Date.now(), serverId: id, error: null, stage: 'ready' });
     startHealthMonitor();
+    startStatsPolling();
     pushNotification('MarinBox', retry ? `Соединение восстановлено: ${server.name}` : `Подключено: ${server.name}`);
   } catch (e) {
     await disconnect({ preserveReconnect: retry });
@@ -582,10 +632,27 @@ function trayImage() {
   return nativeImage.createFromPath(TRAY_ICON).resize({ width: size, height: size, quality: 'best' });
 }
 
+// Значок трея: отдельные иконки под состояние
+function trayImage(variant = 'off') {
+  let scale = 1;
+  try { scale = screen.getPrimaryDisplay().scaleFactor || 1; } catch { /* ignore */ }
+  const size = Math.max(16, Math.round(16 * scale));
+  const file = path.join(__dirname, 'build', `tray-${variant}@2x.png`);
+  const fallback = path.join(__dirname, 'build', 'tray@2x.png');
+  const target = fs.existsSync(file) ? file : fallback;
+  try {
+    return nativeImage.createFromPath(target).resize({ width: size, height: size, quality: 'best' });
+  } catch {
+    return nativeImage.createFromPath(fallback).resize({ width: size, height: size, quality: 'best' });
+  }
+}
+
 function rebuildTray() {
   if (!tray) return;
   const on = status.state === 'connected';
-  tray.setToolTip(on ? 'MarinBox — подключено' : 'MarinBox');
+  const variant = status.state === 'connected' ? 'on' : status.error ? 'err' : 'off';
+  tray.setImage(trayImage(variant));
+  tray.setToolTip(on ? 'MarinBox — подключено' : status.error ? 'MarinBox — ошибка' : 'MarinBox');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Открыть MarinBox', click: showWin },
     {
@@ -1030,7 +1097,7 @@ if (!app.requestSingleInstanceLock()) {
     await sysproxy.cleanupStale(PROXY_STR);
     pendingLink = process.argv.find((a) => /^marinbox:/i.test(a)) || null;
     createWindow();
-    tray = new Tray(trayImage());
+    tray = new Tray(trayImage('off'));
     tray.on('click', showWin);
     rebuildTray();
     app.setLoginItemSettings({ openAtLogin: !!(store.settings && store.settings.startup) });
