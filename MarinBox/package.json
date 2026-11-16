@@ -1,6 +1,6 @@
 {
   "name": "marinbox",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "MarinBox — клиент MarinVPN для Windows",
   "main": "main.js",
   "author": "MarinVPN",
@@ -36,7 +36,10 @@
       "build/icon.png",
       "build/tray@2x.png",
       "CHANGELOG.md",
-      "package.json"
+      "package.json",
+      "build/tray-on@2x.png",
+      "build/tray-off@2x.png",
+      "build/tray-err@2x.png"
     ],
     "extraResources": [
       {
