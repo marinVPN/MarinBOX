@@ -314,15 +314,6 @@
     b.onclick = () => showSettingsSection(b.dataset.section);
   });
 
-  // ───── экран «Маршрутизация»: переносим карточки и ведём сводку ─────
-  function moveRoutingCards() {
-    const host = $('#routesHost');
-    if (!host) return;
-    const section = document.querySelector('#page-settings .settings-section[data-section="routes"]');
-    if (!section) return;
-    const cards = [...section.querySelectorAll('.settings-card')];
-    for (const card of cards) host.append(card);
-  }
   function renderRouteSummary() {
     const apps = (S.settings?.appRules || []).length;
     const cats = (S.settings?.categories || []).length;
@@ -1139,7 +1130,7 @@
 
   function collectSearchItems() {
     const items = [];
-    document.querySelectorAll('#page-settings .setting-row').forEach((row) => {
+    document.querySelectorAll('#page-settings .setting-row, #routesHost .setting-row').forEach((row) => {
       const title = row.querySelector('b');
       const control = row.querySelector('input, select, textarea');
       if (!title || !control) return;
@@ -1173,8 +1164,12 @@
 
   function openSearchItem(item) {
     searchDialog.close();
+    const onRoutes = !!item.row.closest('#page-routes');
     const section = item.row.closest('.settings-section');
-    if (section) {
+    if (onRoutes) {
+      document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === 'routes'));
+      document.querySelectorAll('.page').forEach((page) => { page.hidden = page.id !== 'page-routes'; });
+    } else if (section) {
       document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === 'settings'));
       document.querySelectorAll('.page').forEach((page) => { page.hidden = page.id !== 'page-settings'; });
       showSettingsSection(section.dataset.section);
@@ -1224,7 +1219,6 @@
   marin.onStats((s) => { liveStats = s; renderMetrics(); });
   setInterval(tick, 1000);
   (async () => {
-    moveRoutingCards();
     await loadPresets();
     await loadCategories();
     const r = await marin.state();
