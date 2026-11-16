@@ -53,12 +53,21 @@
   }
 
   // ───── отрисовка ─────
+  const STAGES = {
+    core: 'Запускаем ядро…',
+    proxy: 'Настраиваем прокси…',
+    dns: 'Защищаем DNS…',
+    ready: 'Готово',
+  };
+
   function renderHero() {
     const p = $('#power');
     const st = V.state;
     p.className = 'power' + (st === 'connected' ? ' on' : '') + (st === 'connecting' ? ' busy' : '');
     const t = $('#statusText');
-    t.textContent = st === 'connected' ? 'Подключено' : st === 'connecting' ? 'Подключение…' : 'Отключено';
+    t.textContent = st === 'connected'
+      ? 'Подключено'
+      : st === 'connecting' ? (STAGES[V.stage] || 'Подключение…') : 'Отключено';
     t.className = 'status' + (st === 'connected' ? ' on' : '');
 
     const h = $('#hint');
@@ -69,7 +78,31 @@
     if (V.error && st === 'disconnected') { h.textContent = V.error; h.className = 'hint err'; }
     else if (cur) h.textContent = cur.name;
     else h.textContent = 'Добавьте подписку';
+    renderMetrics();
     tick();
+  }
+
+  // ───── метрики: скорость, трафик, задержка ─────
+  let liveStats = { up: 0, down: 0, speedUp: 0, speedDown: 0 };
+  function fmtSpeed(bytesPerSecond) {
+    if (!bytesPerSecond) return '—';
+    const mbit = (bytesPerSecond * 8) / 1000000;
+    if (mbit >= 1) return mbit.toFixed(mbit >= 10 ? 0 : 1) + ' Мбит/с';
+    return Math.round((bytesPerSecond * 8) / 1000) + ' Кбит/с';
+  }
+  function renderMetrics() {
+    const down = $('#mDown'); const up = $('#mUp');
+    const traffic = $('#mTraffic'); const ping = $('#mPing');
+    if (!down) return;
+    const connected = V.state === 'connected';
+    down.textContent = connected ? fmtSpeed(liveStats.speedDown) : '—';
+    up.textContent = connected ? fmtSpeed(liveStats.speedUp) : '—';
+    const sub = S.subs.find((s) => s.id === activeSub) || S.subs[0];
+    const info = sub && sub.userinfo;
+    traffic.textContent = info && info.download !== undefined ? fmtBytes(info.download) : '—';
+    const id = V.state === 'disconnected' ? S.selectedId : V.serverId;
+    const p = id && pings[id];
+    ping.textContent = p ? `${p} мс` : '—';
   }
 
   function tick() {
@@ -211,6 +244,7 @@
 
   function pingClass(ms) { return ms == null ? '' : ms < 120 ? 'good' : ms < 300 ? 'mid' : 'bad'; }
 
+  let serverFilter = '';
   function renderServers() {
     const list = $('#list');
     list.replaceChildren();
@@ -219,7 +253,15 @@
       list.append(mk('div', 'empty', 'Пока пусто. Нажмите «Добавить» и вставьте ссылку подписки или ключ.'));
       return;
     }
-    for (const s of sub.servers) {
+    const query = serverFilter.trim().toLowerCase();
+    const shown = query
+      ? sub.servers.filter((s) => `${serverDisplayName(s)} ${s.host} ${s.protocol}`.toLowerCase().includes(query))
+      : sub.servers;
+    if (!shown.length) {
+      list.append(mk('div', 'empty', 'Ничего не найдено'));
+      return;
+    }
+    for (const s of shown) {
       const b = mk('button', 'item' + (s.id === S.selectedId ? ' sel' : ''));
       b.append(mk('span', 'proto', s.protocol === 'shadowsocks' ? 'ss' : s.protocol));
       const [flag, country] = countryForServer(s);
@@ -272,6 +314,25 @@
     b.onclick = () => showSettingsSection(b.dataset.section);
   });
 
+  // ───── экран «Маршрутизация»: переносим карточки и ведём сводку ─────
+  function moveRoutingCards() {
+    const host = $('#routesHost');
+    if (!host) return;
+    const section = document.querySelector('#page-settings .settings-section[data-section="routes"]');
+    if (!section) return;
+    const cards = [...section.querySelectorAll('.settings-card')];
+    for (const card of cards) host.append(card);
+  }
+  function renderRouteSummary() {
+    const apps = (S.settings?.appRules || []).length;
+    const cats = (S.settings?.categories || []).length;
+    const excl = String(S.settings?.bypassDomains || '').split(/[\s,;]+/).filter(Boolean).length
+      + String(S.settings?.bypassIps || '').split(/[\s,;]+/).filter(Boolean).length;
+    const set = (id, value) => { const el = $(id); if (el) el.textContent = String(value); };
+    set('#sumApps', apps);
+    set('#sumCats', cats);
+    set('#sumExcl', excl);
+  }
   // ───── правила по приложениям ─────
   function renderAppRules() {
     const box = $('#appRules');
@@ -431,6 +492,7 @@
     renderAppRules();
     renderCategories();
     renderDns();
+    renderRouteSummary();
   }
 
   // Чекбоксы пресетов маршрутизации
@@ -689,6 +751,13 @@
     act(() => marin.connect(S.selectedId));
   };
   $('#btnPing').onclick = pingActive;
+  const serverSearch = $('#serverSearch');
+  if (serverSearch) {
+    serverSearch.addEventListener('input', (event) => {
+      serverFilter = event.target.value || '';
+      renderServers();
+    });
+  }
   $('#cabinetGetCode').onclick = async () => {
     const button = $('#cabinetGetCode');
     button.disabled = true;
@@ -1060,12 +1129,102 @@
     if (btn) btn.hidden = false;
   });
 
+
+  // ───── поиск по настройкам (Ctrl+K) ─────
+  const searchDialog = $('#searchDialog');
+  const searchInput = $('#searchInput');
+  const searchResults = $('#searchResults');
+  let searchItems = [];
+  let searchIndex = 0;
+
+  function collectSearchItems() {
+    const items = [];
+    document.querySelectorAll('#page-settings .setting-row').forEach((row) => {
+      const title = row.querySelector('b');
+      const control = row.querySelector('input, select, textarea');
+      if (!title || !control) return;
+      const section = row.closest('.settings-section');
+      const sectionTitle = section && section.dataset.section ? section.dataset.section : '';
+      const text = title.textContent + ' ' + row.textContent;
+      items.push({ title: title.textContent.trim(), control, row, sectionTitle, keywords: text.toLowerCase() });
+    });
+    return items;
+  }
+
+  function renderSearchResults(query) {
+    const all = collectSearchItems();
+    const q = query.trim().toLowerCase();
+    const found = q ? all.filter((i) => i.keywords.includes(q)) : all;
+    searchResults.replaceChildren();
+    searchIndex = 0;
+    searchItems = found.slice(0, 40);
+    if (!searchItems.length) {
+      searchResults.append(mk('div', 'empty-hint', 'Ничего не найдено'));
+      return;
+    }
+    searchItems.forEach((item, index) => {
+      const row = mk('button', 'search-item' + (index === 0 ? ' active' : ''));
+      row.append(mk('span', 'search-item-title', item.title));
+      if (item.sectionTitle) row.append(mk('span', 'search-item-section', item.sectionTitle));
+      row.onclick = () => openSearchItem(item);
+      searchResults.append(row);
+    });
+  }
+
+  function openSearchItem(item) {
+    searchDialog.close();
+    const section = item.row.closest('.settings-section');
+    if (section) {
+      document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === 'settings'));
+      document.querySelectorAll('.page').forEach((page) => { page.hidden = page.id !== 'page-settings'; });
+      showSettingsSection(section.dataset.section);
+    }
+    setTimeout(() => {
+      item.row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      item.row.classList.add('flash');
+      setTimeout(() => item.row.classList.remove('flash'), 1600);
+      if (item.control && typeof item.control.focus === 'function') item.control.focus({ preventScroll: true });
+    }, 120);
+  }
+
+  function openSearch() {
+    searchInput.value = '';
+    renderSearchResults('');
+    if (!searchDialog.open) searchDialog.showModal();
+    setTimeout(() => searchInput.focus(), 30);
+  }
+
+  searchInput.addEventListener('input', (event) => renderSearchResults(event.target.value));
+  searchInput.addEventListener('keydown', (event) => {
+    const rows = [...searchResults.querySelectorAll('.search-item')];
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!rows.length) return;
+      searchIndex = Math.max(0, Math.min(rows.length - 1, searchIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+      rows.forEach((r, i) => r.classList.toggle('active', i === searchIndex));
+      rows[searchIndex].scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const item = searchItems[searchIndex];
+      if (item) openSearchItem(item);
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      openSearch();
+    }
+  });
+  searchDialog.addEventListener('click', (event) => { if (event.target === searchDialog) searchDialog.close(); });
+
   // ───── старт ─────
   marin.onState(apply);
   marin.onStatus((s) => { V = s; renderHero(); });
   marin.onToast((m) => toast(m));
+  marin.onStats((s) => { liveStats = s; renderMetrics(); });
   setInterval(tick, 1000);
   (async () => {
+    moveRoutingCards();
     await loadPresets();
     await loadCategories();
     const r = await marin.state();
