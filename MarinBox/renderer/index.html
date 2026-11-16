@@ -23,34 +23,47 @@
     <nav class="nav" aria-label="Разделы">
       <button class="nav-btn active" data-page="home">Главная</button>
       <button class="nav-btn" data-page="cabinet">Кабинет</button>
+      <button class="nav-btn" data-page="routes">Маршрутизация</button>
       <button class="nav-btn" data-page="settings">Настройки</button>
     </nav>
     <main>
       <div class="page" id="page-home">
-      <section class="glass hero">
-        <button id="power" class="power" aria-label="Подключить / отключить">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>
-          </svg>
-        </button>
-        <div id="statusText" class="status">Отключено</div>
-        <div id="hint" class="hint">Добавьте подписку MarinVPN</div>
-        <div class="chips">
-          <span class="chip" id="timer">00:00:00</span>
-          <span class="chip" id="proxyInfo">Системный прокси</span>
-        </div>
-      </section>
+        <section class="glass sub" id="subCard" hidden></section>
+        <div class="home-grid">
+          <section class="glass hero">
+            <button id="power" class="power" aria-label="Подключить / отключить">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>
+              </svg>
+            </button>
+            <div id="statusText" class="status">Отключено</div>
+            <div id="hint" class="hint">Добавьте подписку MarinVPN</div>
+            <div class="metrics" id="metrics">
+              <div class="metric"><span class="metric-value" id="mDown">—</span><span class="metric-label">приём</span></div>
+              <div class="metric"><span class="metric-value" id="mUp">—</span><span class="metric-label">передача</span></div>
+              <div class="metric"><span class="metric-value" id="mTraffic">—</span><span class="metric-label">за месяц</span></div>
+              <div class="metric"><span class="metric-value" id="mPing">—</span><span class="metric-label">задержка</span></div>
+            </div>
+            <div class="chips">
+              <span class="chip" id="timer">00:00:00</span>
+              <span class="chip" id="proxyInfo">Системный прокси</span>
+            </div>
+          </section>
 
-      <section class="glass sub" id="subCard" hidden></section>
-
-      <section class="glass servers">
-        <div class="sec-head">
-          <div class="sec-title">Серверы</div>
-          <button class="ghost" id="btnPing" title="Время TCP-подключения до узла сервера">Задержка</button>
+          <div class="home-side">
+            <section class="glass servers">
+              <div class="sec-head">
+                <div class="sec-title">Серверы</div>
+                <div class="sec-tools">
+                  <input id="serverSearch" class="search-input server-search" placeholder="Поиск сервера…" spellcheck="false">
+                  <button class="ghost" id="btnPing" title="Время TCP-подключения до узла сервера">Задержка</button>
+                </div>
+              </div>
+              <p class="latency-note">Проверяется доступность узла; это не пинг через VPN-туннель.</p>
+              <div id="list" class="list"></div>
+            </section>
+          </div>
         </div>
-        <p class="latency-note">Проверяется доступность узла; это не пинг через VPN-туннель.</p>
-        <div id="list" class="list"></div>
-      </section>
       </div>
       <div class="page cabinet-page" id="page-cabinet" hidden>
         <section class="glass cabinet-head">
@@ -89,6 +102,21 @@
           </section>
           <button class="ghost cabinet-logout" id="cabinetLogout" type="button">Отключить аккаунт</button>
         </section>
+      </div>
+
+      <div class="page" id="page-routes" hidden>
+        <section class="glass routes-summary">
+          <div class="sec-title">Схема маршрутизации</div>
+          <div class="scheme">
+            <div class="scheme-step"><span class="scheme-num">1</span><span class="scheme-name">Приложения</span><span class="scheme-count" id="sumApps">0</span></div>
+            <div class="scheme-arrow">→</div>
+            <div class="scheme-step"><span class="scheme-num">2</span><span class="scheme-name">Категории</span><span class="scheme-count" id="sumCats">0</span></div>
+            <div class="scheme-arrow">→</div>
+            <div class="scheme-step"><span class="scheme-num">3</span><span class="scheme-name">Исключения</span><span class="scheme-count" id="sumExcl">0</span></div>
+          </div>
+          <p class="muted">Правила проверяются сверху вниз: первое совпадение решает, куда пойдёт трафик.</p>
+        </section>
+        <div id="routesHost"></div>
       </div>
       <div class="page" id="page-settings" hidden>
         <nav class="settings-tabs" id="settingsTabs" aria-label="Разделы настроек">
@@ -292,6 +320,13 @@
       <div class="spacer"></div>
       <button class="primary" type="button" data-close-dialog="changelogDialog">Понятно</button>
     </div>
+  </dialog>
+
+
+  <dialog id="searchDialog" class="search-dialog">
+    <input id="searchInput" class="search-field" placeholder="Поиск по настройкам… (Ctrl+K)" spellcheck="false">
+    <div id="searchResults" class="search-results"></div>
+    <div class="search-hint">↑ ↓ — переход, Enter — открыть, Esc — закрыть</div>
   </dialog>
 
   <dialog id="dlg">
