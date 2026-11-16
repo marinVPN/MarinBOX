@@ -49,4 +49,5 @@ contextBridge.exposeInMainWorld('marin', {
   onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_e, m) => cb(m)),
   onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (_e, p) => cb(p)),
   onChangelog: (cb) => ipcRenderer.on('changelog:show', (_e, m) => cb(m)),
+  onStats: (cb) => ipcRenderer.on('stats:update', (_e, s) => cb(s)),
 });
