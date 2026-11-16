@@ -119,7 +119,7 @@ function buildTunInbound(sniffing) {
 function buildConfig(server, {
   socksPort = 10808, httpPort = 10809, logLevel = 'warning', logPath, bypassDomains = [], bypassIps = [],
   routePresets = [], tun = false, appRules = [], categories = [],
-  dnsPreset = 'system', dnsCustom = '', dnsDoh = false,
+  dnsPreset = 'system', dnsCustom = '', dnsDoh = false, statsPort = 0,
 } = {}) {
   const sniffing = { enabled: true, destOverride: ['http', 'tls', 'quic'] };
   const rules = [];
@@ -193,6 +193,17 @@ function buildConfig(server, {
       : (preset && preset.doh ? preset.doh : dnsServers.map((s) => `https://${s}/dns-query`));
     config.dns = { servers, queryStrategy: 'UseIP' };
     outbounds.push({ tag: 'dns-out', protocol: 'dns' });
+  }
+  // Живая статистика: api в упрощённом режиме (Xray >= 1.8.12) + счётчики
+  if (statsPort) {
+    config.api = { tag: 'api', listen: `127.0.0.1:${statsPort}`, services: ['HandlerService', 'StatsService'] };
+    config.stats = {};
+    config.policy = {
+      system: {
+        statsOutboundUplink: true, statsOutboundDownlink: true,
+        statsInboundUplink: true, statsInboundDownlink: true,
+      },
+    };
   }
   return config;
 }
