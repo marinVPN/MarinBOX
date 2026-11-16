@@ -116,13 +116,66 @@
           </div>
           <p class="muted">Правила проверяются сверху вниз: первое совпадение решает, куда пойдёт трафик.</p>
         </section>
-        <div id="routesHost"></div>
+        <div id="routesHost">
+<section class="glass settings-card">
+            <div class="sec-title">Правила маршрутизации</div>
+            <p class="muted">Готовые наборы правил применяются при следующем подключении.</p>
+            <div id="routePresets" class="preset-list"></div>
+          </section>
+
+          <section class="glass settings-card">
+            <div class="sec-title">Приложения</div>
+            <p class="muted">Правила по процессу: конкретную программу можно пустить мимо VPN или наоборот — только через него. Правила проверяются первыми, раньше доменных.</p>
+            <div id="appRules" class="rule-list"></div>
+            <div class="rule-add">
+              <input id="appRuleName" list="appNameHints" placeholder="Telegram.exe" spellcheck="false">
+              <select id="appRuleMode">
+                <option value="direct">мимо VPN</option>
+                <option value="proxy">через VPN</option>
+                <option value="block">заблокировать</option>
+              </select>
+              <button class="primary" id="btnAddAppRule" type="button">Добавить</button>
+            </div>
+            <datalist id="appNameHints">
+              <option value="Telegram.exe"></option>
+              <option value="Discord.exe"></option>
+              <option value="Steam.exe"></option>
+              <option value="steam.exe"></option>
+              <option value="EpicGamesLauncher.exe"></option>
+              <option value="RiotClientServices.exe"></option>
+              <option value="chrome.exe"></option>
+              <option value="msedge.exe"></option>
+              <option value="firefox.exe"></option>
+              <option value="Spotify.exe"></option>
+              <option value="WhatsApp.exe"></option>
+              <option value="Zoom.exe"></option>
+              <option value="Teams.exe"></option>
+              <option value="Skype.exe"></option>
+              <option value="viber.exe"></option>
+              <option value="java.exe"></option>
+              <option value="python.exe"></option>
+              <option value="node.exe"></option>
+            </datalist>
+          </section>
+
+          <section class="glass settings-card">
+            <div class="sec-title">Категории сайтов</div>
+            <p class="muted" id="categoryHint">Категории из базы geosite. Выберите, что блокировать или пускать напрямую.</p>
+            <input id="categorySearch" class="search-input" placeholder="Поиск: реклама, игры, крипта…" spellcheck="false">
+            <div id="categoryList" class="category-list"></div>
+            <p class="muted" id="categorySelected">Выбрано: 0</p>
+          </section>
+          <section class="glass settings-card">
+            <div class="sec-title">Свои исключения</div>
+            <label class="setting-row"><span><b>Домены напрямую</b><small>Через запятую или с новой строки; изменения применятся при следующем подключении</small></span><textarea id="settingBypassDomains" rows="3" placeholder="example.com"></textarea></label>
+            <label class="setting-row"><span><b>IP-адреса и CIDR напрямую</b><small>IPv4/IPv6; изменения применятся при следующем подключении</small></span><textarea id="settingBypassIps" rows="3" placeholder="192.0.2.10"></textarea></label>
+          </section>
+        </div>
       </div>
       <div class="page" id="page-settings" hidden>
         <nav class="settings-tabs" id="settingsTabs" aria-label="Разделы настроек">
           <button class="settings-tab active" data-section="app" type="button">Приложение</button>
           <button class="settings-tab" data-section="vpn" type="button">VPN</button>
-          <button class="settings-tab" data-section="routes" type="button">Маршрутизация</button>
           <button class="settings-tab" data-section="core" type="button">Xray</button>
           <button class="settings-tab" data-section="about" type="button">О программе</button>
         </nav>
@@ -188,62 +241,6 @@
             </label>
             <label class="setting-row" id="settingDnsCustomRow" hidden><span><b>Свои серверы</b><small>Через запятую или с новой строки</small></span><textarea id="settingDnsCustom" rows="2" placeholder="1.1.1.1, 8.8.8.8"></textarea></label>
             <label class="setting-row"><span><b>DNS через VPN (DoH)</b><small>Запросы шифруются и идут через туннель — провайдер не сможет подменить ответы</small></span><input id="settingDnsDoh" type="checkbox"></label>
-          </section>
-        </div>
-
-        <div class="settings-section" data-section="routes" hidden>
-          <section class="glass settings-card">
-            <div class="sec-title">Правила маршрутизации</div>
-            <p class="muted">Готовые наборы правил применяются при следующем подключении.</p>
-            <div id="routePresets" class="preset-list"></div>
-          </section>
-
-          <section class="glass settings-card">
-            <div class="sec-title">Приложения</div>
-            <p class="muted">Правила по процессу: конкретную программу можно пустить мимо VPN или наоборот — только через него. Правила проверяются первыми, раньше доменных.</p>
-            <div id="appRules" class="rule-list"></div>
-            <div class="rule-add">
-              <input id="appRuleName" list="appNameHints" placeholder="Telegram.exe" spellcheck="false">
-              <select id="appRuleMode">
-                <option value="direct">мимо VPN</option>
-                <option value="proxy">через VPN</option>
-                <option value="block">заблокировать</option>
-              </select>
-              <button class="primary" id="btnAddAppRule" type="button">Добавить</button>
-            </div>
-            <datalist id="appNameHints">
-              <option value="Telegram.exe"></option>
-              <option value="Discord.exe"></option>
-              <option value="Steam.exe"></option>
-              <option value="steam.exe"></option>
-              <option value="EpicGamesLauncher.exe"></option>
-              <option value="RiotClientServices.exe"></option>
-              <option value="chrome.exe"></option>
-              <option value="msedge.exe"></option>
-              <option value="firefox.exe"></option>
-              <option value="Spotify.exe"></option>
-              <option value="WhatsApp.exe"></option>
-              <option value="Zoom.exe"></option>
-              <option value="Teams.exe"></option>
-              <option value="Skype.exe"></option>
-              <option value="viber.exe"></option>
-              <option value="java.exe"></option>
-              <option value="python.exe"></option>
-              <option value="node.exe"></option>
-            </datalist>
-          </section>
-
-          <section class="glass settings-card">
-            <div class="sec-title">Категории сайтов</div>
-            <p class="muted" id="categoryHint">Категории из базы geosite. Выберите, что блокировать или пускать напрямую.</p>
-            <input id="categorySearch" class="search-input" placeholder="Поиск: реклама, игры, крипта…" spellcheck="false">
-            <div id="categoryList" class="category-list"></div>
-            <p class="muted" id="categorySelected">Выбрано: 0</p>
-          </section>
-          <section class="glass settings-card">
-            <div class="sec-title">Свои исключения</div>
-            <label class="setting-row"><span><b>Домены напрямую</b><small>Через запятую или с новой строки; изменения применятся при следующем подключении</small></span><textarea id="settingBypassDomains" rows="3" placeholder="example.com"></textarea></label>
-            <label class="setting-row"><span><b>IP-адреса и CIDR напрямую</b><small>IPv4/IPv6; изменения применятся при следующем подключении</small></span><textarea id="settingBypassIps" rows="3" placeholder="192.0.2.10"></textarea></label>
           </section>
         </div>
 
