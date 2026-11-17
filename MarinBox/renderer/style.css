@@ -169,6 +169,7 @@ main::-webkit-scrollbar-thumb { background: var(--glass-hi); border-radius: 6px;
 .item:hover { background: var(--glass-hi); }
 .item.sel { border-color: rgba(53, 230, 207, .55); background: linear-gradient(135deg, rgba(53, 230, 207, .14), rgba(122, 92, 255, .14)); }
 .proto { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 2px 7px; border-radius: 6px; background: rgba(122, 92, 255, .25); color: #cfc6ff; text-transform: uppercase; }
+:root[data-theme="light"] .proto { background: rgba(122, 92, 255, .14); color: #5b46c9; }
 .country-flag { flex: 0 0 24px; width: 24px; height: 18px; object-fit: contain; text-align: center; font-size: 18px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
 img.country-flag { border-radius: 2px; }
 .iname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -195,7 +196,7 @@ dialog {
   margin: auto; width: min(380px, 92vw); padding: 20px; border-radius: 24px; color: var(--text);
   border: 1px solid var(--stroke); background: rgba(14, 20, 50, .94); box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
 }
-dialog::backdrop { background: rgba(2, 4, 12, .6); backdrop-filter: blur(6px); }
+dialog::backdrop { background: rgba(2, 4, 12, .45); backdrop-filter: blur(6px); }
 dialog h3 { margin-bottom: 6px; }
 .muted { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
 textarea {
@@ -298,6 +299,7 @@ select { color: var(--text); background: #151d3e; border: 1px solid var(--stroke
   flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 10px;
   border: 1px solid var(--stroke); background: rgba(0, 0, 0, .18); color: var(--text);
 }
+.rule-add input:focus, .search-input:focus { outline: none; border-color: var(--accent); }
 :root[data-theme="light"] .rule-add input, :root[data-theme="light"] .search-input { background: #fff; }
 .rule-add select { padding: 8px 10px; }
 .category-list {
