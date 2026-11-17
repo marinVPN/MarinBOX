@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('marin', {
   routeCategories: call('route:categories'),
   changelog: call('changelog:get'),
   xrayCheck: call('xray:check'),
+  xrayVersion: call('xray:version'),
   xrayUpdate: call('xray:update'),
   checkUpdate: call('update:check'),
   downloadUpdate: call('update:download'),
