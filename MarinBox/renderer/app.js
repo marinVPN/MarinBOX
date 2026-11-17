@@ -152,7 +152,7 @@
     details.append(mk('div', 'sub-detail', `Обновлено: ${updated}`));
     const refreshInfo = interval > 0 ? `Интервал обновления: ${interval} ч.` : sub.url ? (S.settings?.refresh === false ? 'Обновление при запуске выключено' : 'Обновление при запуске включено') : 'Добавлено вручную';
     details.append(mk('div', 'sub-detail', refreshInfo));
-    details.append(mk('div', 'sub-detail', `Серверов: ${visibleServers(sub.servers).length}`));
+    details.append(mk('div', 'sub-detail', `Серверов: ${sub.servers.length}`));
     box.append(details);
 
     const u = sub.userinfo;
@@ -247,12 +247,11 @@
 
   function pingClass(ms) { return ms == null ? '' : ms < 120 ? 'good' : ms < 300 ? 'mid' : 'bad'; }
 
-  // Панели кладут в подписку служебную запись с остатком трафика — в списке серверов она лишняя.
+  // Панель кладёт в подписку служебную запись об остатке трафика («Осталось - ∞ ✅»).
+  // Показываем её в списке, но как справку: выбрать или пропинговать её нельзя.
   const SERVICE_NAME = /^\s*(осталось|срок действия|трафик|подписка)/i;
-  function visibleServers(servers) {
-    const list = (servers || []).filter((s) => !SERVICE_NAME.test(String(s.name || '')));
-    return list.length ? list : (servers || []);
-  }
+  const isServiceServer = (server) => SERVICE_NAME.test(String(server && server.name || ''));
+  const connectableServers = (servers) => (servers || []).filter((s) => !isServiceServer(s));
 
   let serverFilter = '';
   function renderServers() {
@@ -263,7 +262,7 @@
       list.append(mk('div', 'empty', 'Пока пусто. Нажмите «Добавить» и вставьте ссылку подписки или ключ.'));
       return;
     }
-    const all = visibleServers(sub.servers);
+    const all = sub.servers;
     const query = serverFilter.trim().toLowerCase();
     const shown = query
       ? all.filter((s) => `${serverDisplayName(s)} ${s.host} ${s.protocol}`.toLowerCase().includes(query))
@@ -273,6 +272,13 @@
       return;
     }
     for (const s of shown) {
+      if (isServiceServer(s)) {
+        const row = mk('div', 'item info');
+        row.title = 'Служебная запись панели: остаток трафика и срок подписки';
+        row.append(mk('span', 'proto info', 'инфо'), mk('span', 'iname', serverDisplayName(s)));
+        list.append(row);
+        continue;
+      }
       const b = mk('button', 'item' + (s.id === S.selectedId ? ' sel' : ''));
       b.append(mk('span', 'proto', s.protocol === 'shadowsocks' ? 'ss' : s.protocol));
       const [flag, country] = countryForServer(s);
@@ -709,6 +715,8 @@
   // ───── действия ─────
   async function selectServer(id) {
     if (id === S.selectedId) return;
+    const target = S.subs.flatMap((s) => s.servers || []).find((s) => s.id === id);
+    if (isServiceServer(target)) return;
     await marin.select(id);
     if (V.state === 'connected') act(() => marin.connect(id));
   }
@@ -732,6 +740,7 @@
       button.disabled = false;
       button.textContent = 'Задержка';
       renderServers();
+      renderMetrics(); // карточка метрик должна брать те же задержки, что и список
       if (pingQueued) { pingQueued = false; pingActive(); }
     }
   }
@@ -743,10 +752,10 @@
       const sel = subOf(S.selectedId);
       activeSub = (sel || S.subs[0] || {}).id || null;
     }
-    // Служебная запись подписки не должна оставаться выбранным «сервером»
+    // Служебная запись подписки («Осталось …») не должна оставаться выбранным «сервером»
     const current = S.subs.flatMap((s) => s.servers || []).find((s) => s.id === S.selectedId);
-    if (!current || SERVICE_NAME.test(String(current.name || ''))) {
-      const first = visibleServers(S.subs.flatMap((s) => s.servers || []))[0];
+    if (!current || isServiceServer(current)) {
+      const first = connectableServers(S.subs.flatMap((s) => s.servers || []))[0];
       if (first && first.id !== S.selectedId) marin.select(first.id).catch(() => {});
     }
     render();
