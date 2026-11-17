@@ -8,6 +8,13 @@
 
   const serverById = (id) => state.subs.flatMap((s) => s.servers).find((x) => x.id === id);
 
+  // Windows не рисует флаги-эмодзи, а панели кладут в название ещё и код страны — убираем оба
+  function cleanName(name) {
+    return String(name || '')
+      .replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, '')
+      .replace(/^[A-Z]{2}\s*/, '');
+  }
+
   function render() {
     const power = $('#widgetPower');
     power.className = 'widget-power' + (vpn.state === 'connected' ? ' on' : '') + (vpn.state === 'connecting' ? ' busy' : '');
@@ -15,7 +22,7 @@
     const id = vpn.state === 'disconnected' ? state.selectedId : vpn.serverId;
     const server = serverById(id);
     const ping = id && pings[id];
-    $('#widgetServer').textContent = server ? `${server.name}${ping ? ` · ${ping} мс` : ''}` : 'Нет подписки';
+    $('#widgetServer').textContent = server ? `${cleanName(server.name)}${ping ? ` · ${ping} мс` : ''}` : 'Нет подписки';
   }
 
   $('#widgetPower').onclick = async () => {
