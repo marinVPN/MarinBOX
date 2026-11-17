@@ -24,6 +24,18 @@ Windows-клиент MarinVPN в духе Happ: добавляете ссылк�
 - **Уведомления Windows**: подключение, потеря связи, восстановление, обновления
 - **Автообновление приложения**: проверка новой версии при запуске, скачивание и установка
 
+## Скриншоты
+
+Снимки сделаны в работающем клиенте с включённым VPN.
+
+| | |
+|:--:|:--:|
+| <img src="docs/screens/01-home.png" width="420"><br><sub><b>Главный экран.</b> Живая скорость, трафик и задержка</sub> | <img src="docs/screens/02-servers-search.png" width="420"><br><sub><b>Серверы.</b> Поиск по стране и задержка</sub> |
+| <img src="docs/screens/03-routes.png" width="420"><br><sub><b>Маршрутизация.</b> Схема правил и пресеты</sub> | <img src="docs/screens/09-settings-xray.png" width="420"><br><sub><b>Настройки · Xray.</b> Ядро и журнал</sub> |
+| <img src="docs/screens/14-cabinet.png" width="420"><br><sub><b>Кабинет.</b> Баланс, оплата, ключи</sub> | <img src="docs/screens/15-light.png" width="420"><br><sub><b>Светлая тема</b></sub> |
+
+Полный набор — в папке [`docs/screens`](docs/screens).
+
 ## Сборка exe (на Windows)
 
 Нужен Node.js 20+.
