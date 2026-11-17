@@ -76,7 +76,7 @@
     if (chip) chip.textContent = S.settings?.tun ? 'TUN-режим' : 'Системный прокси';
     const cur = serverById(st === 'disconnected' ? S.selectedId : V.serverId);
     if (V.error && st === 'disconnected') { h.textContent = V.error; h.className = 'hint err'; }
-    else if (cur) h.textContent = cur.name;
+    else if (cur) h.textContent = serverDisplayName(cur);
     else h.textContent = 'Добавьте подписку';
     renderMetrics();
     tick();
@@ -123,7 +123,7 @@
     if (!sub) { box.hidden = true; return; }
     box.hidden = false;
 
-    if (S.subs.length) {
+    if (S.subs.length > 1) {
       const tabs = mk('div', 'tabs');
       for (const s of S.subs) {
         const b = mk('button', 'tab' + (s.id === activeSub ? ' active' : ''));
@@ -152,7 +152,7 @@
     details.append(mk('div', 'sub-detail', `Обновлено: ${updated}`));
     const refreshInfo = interval > 0 ? `Интервал обновления: ${interval} ч.` : sub.url ? (S.settings?.refresh === false ? 'Обновление при запуске выключено' : 'Обновление при запуске включено') : 'Добавлено вручную';
     details.append(mk('div', 'sub-detail', refreshInfo));
-    details.append(mk('div', 'sub-detail', `Серверов: ${sub.servers.length}`));
+    details.append(mk('div', 'sub-detail', `Серверов: ${visibleServers(sub.servers).length}`));
     box.append(details);
 
     const u = sub.userinfo;
@@ -237,12 +237,22 @@
   function serverDisplayName(server) {
     const [flag] = countryForServer(server);
     const codePoints = [...flag].map((char) => char.codePointAt(0));
-    if (codePoints.length !== 2 || codePoints.some((point) => point < 0x1f1e6 || point > 0x1f1ff)) return server.name;
+    let name = String(server.name || '');
+    if (codePoints.length !== 2 || codePoints.some((point) => point < 0x1f1e6 || point > 0x1f1ff)) return name;
     const code = codePoints.map((point) => String.fromCharCode(point - 0x1f1e6 + 65)).join('');
-    return String(server.name || '').replace(new RegExp(`^${code}\\s+`, 'i'), '');
+    // Windows не рисует флаги-эмодзи: убираем и сам эмодзи, и двухбуквенный код страны в начале
+    name = name.replace(new RegExp(`^${String.fromCodePoint(...codePoints)}\\s*`, 'u'), '');
+    return name.replace(new RegExp(`^${code}\\s*`, 'i'), '');
   }
 
   function pingClass(ms) { return ms == null ? '' : ms < 120 ? 'good' : ms < 300 ? 'mid' : 'bad'; }
+
+  // Панели кладут в подписку служебную запись с остатком трафика — в списке серверов она лишняя.
+  const SERVICE_NAME = /^\s*(осталось|срок действия|трафик|подписка)/i;
+  function visibleServers(servers) {
+    const list = (servers || []).filter((s) => !SERVICE_NAME.test(String(s.name || '')));
+    return list.length ? list : (servers || []);
+  }
 
   let serverFilter = '';
   function renderServers() {
@@ -253,10 +263,11 @@
       list.append(mk('div', 'empty', 'Пока пусто. Нажмите «Добавить» и вставьте ссылку подписки или ключ.'));
       return;
     }
+    const all = visibleServers(sub.servers);
     const query = serverFilter.trim().toLowerCase();
     const shown = query
-      ? sub.servers.filter((s) => `${serverDisplayName(s)} ${s.host} ${s.protocol}`.toLowerCase().includes(query))
-      : sub.servers;
+      ? all.filter((s) => `${serverDisplayName(s)} ${s.host} ${s.protocol}`.toLowerCase().includes(query))
+      : all;
     if (!shown.length) {
       list.append(mk('div', 'empty', 'Ничего не найдено'));
       return;
@@ -732,6 +743,12 @@
       const sel = subOf(S.selectedId);
       activeSub = (sel || S.subs[0] || {}).id || null;
     }
+    // Служебная запись подписки не должна оставаться выбранным «сервером»
+    const current = S.subs.flatMap((s) => s.servers || []).find((s) => s.id === S.selectedId);
+    if (!current || SERVICE_NAME.test(String(current.name || ''))) {
+      const first = visibleServers(S.subs.flatMap((s) => s.servers || []))[0];
+      if (first && first.id !== S.selectedId) marin.select(first.id).catch(() => {});
+    }
     render();
   }
 
@@ -1129,13 +1146,15 @@
   let searchIndex = 0;
 
   function collectSearchItems() {
+    const SECTIONS = { app: 'Приложение', vpn: 'VPN', core: 'Xray', about: 'О программе' };
     const items = [];
     document.querySelectorAll('#page-settings .setting-row, #routesHost .setting-row').forEach((row) => {
       const title = row.querySelector('b');
       const control = row.querySelector('input, select, textarea');
       if (!title || !control) return;
       const section = row.closest('.settings-section');
-      const sectionTitle = section && section.dataset.section ? section.dataset.section : '';
+      const sectionKey = section && section.dataset.section ? section.dataset.section : '';
+      const sectionTitle = SECTIONS[sectionKey] || (row.closest('#page-routes') ? 'Маршрутизация' : '');
       const text = title.textContent + ' ' + row.textContent;
       items.push({ title: title.textContent.trim(), control, row, sectionTitle, keywords: text.toLowerCase() });
     });
@@ -1223,5 +1242,6 @@
     await loadCategories();
     const r = await marin.state();
     if (r.ok) { apply(r.data); pingActive(); }
+    marin.xrayVersion().then((v) => { if (v.ok) setXrayVersion(v.data); }).catch(() => {});
   })();
 })();
