@@ -321,14 +321,17 @@ function startStatsPolling() {
   stopStatsPolling();
   if (!statsPort) return;
   lastStats = { up: 0, down: 0, at: Date.now() };
+  // Запрашиваем без шаблонов: Xray учитывает только последний шаблон в списке,
+  // а пустой список отдаёт все счётчики. Считаем по входящим подключениям
+  // приложения (http/socks/tun) — они растут всегда.
+  const total = (map, direction) => Object.keys(map)
+    .filter((name) => name.startsWith('inbound>>>') && name.endsWith(`>>>traffic>>>${direction}`))
+    .reduce((sum, name) => sum + (map[name] || 0), 0);
   statsTimer = setInterval(async () => {
     try {
-      const map = await xrayStats.queryStats([
-        'outbound>>>proxy>>>traffic>>>uplink',
-        'outbound>>>proxy>>>traffic>>>downlink',
-      ], { port: statsPort });
-      const up = map['outbound>>>proxy>>>traffic>>>uplink'] || 0;
-      const down = map['outbound>>>proxy>>>traffic>>>downlink'] || 0;
+      const map = await xrayStats.queryStats([], { port: statsPort });
+      const up = total(map, 'uplink');
+      const down = total(map, 'downlink');
       const now = Date.now();
       const dt = Math.max(0.5, (now - lastStats.at) / 1000);
       const speedUp = Math.max(0, (up - lastStats.up) / dt);
@@ -622,14 +625,6 @@ function createWindow() {
     if (store.settings?.tray !== false) { e.preventDefault(); win.hide(); }
     else { quitting = true; app.quit(); }
   });
-}
-
-// Значок трея: базовые 16 px, но с учётом масштаба экрана, чтобы не мылить.
-function trayImage() {
-  let scale = 1;
-  try { scale = screen.getPrimaryDisplay().scaleFactor || 1; } catch { /* ignore */ }
-  const size = Math.max(16, Math.round(16 * scale));
-  return nativeImage.createFromPath(TRAY_ICON).resize({ width: size, height: size, quality: 'best' });
 }
 
 // Значок трея: отдельные иконки под состояние
@@ -1000,6 +995,7 @@ function setupIpc() {
     const list = geositeCatalog.buildCatalog(path.join(dir, 'geosite.dat'));
     return list;
   });
+  handle('xray:version', async () => xrayVersion(xrayPath()));
   handle('xray:check', async () => {
     const current = xrayVersion(xrayPath());
     const release = await fetchXrayRelease();
