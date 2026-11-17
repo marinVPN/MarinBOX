@@ -38,13 +38,23 @@ MarinBox — десктоп-клиент для Windows в духе Happ: доб
 
 ## Скриншоты
 
-<div align="center">
-  <img src="MarinBox/docs/shot-home.png" width="380" alt="Главная">
-  <img src="MarinBox/docs/shot-settings.png" width="380" alt="Настройки">
-</div>
+Все снимки сделаны в работающем клиенте с включённым VPN.
+
+| | |
+|:--:|:--:|
+| <img src="MarinBox/docs/screens/01-home.png" width="430"><br><sub><b>Главный экран.</b> Статус, живая скорость приёма и передачи, трафик за месяц, задержка</sub> | <img src="MarinBox/docs/screens/02-servers-search.png" width="430"><br><sub><b>Поиск по серверам.</b> Фильтр по стране, задержка до каждого узла</sub> |
+| <img src="MarinBox/docs/screens/03-routes.png" width="430"><br><sub><b>Маршрутизация.</b> Схема правил: приложения → категории → исключения</sub> | <img src="MarinBox/docs/screens/04-routes-apps.png" width="430"><br><sub><b>Правила по приложениям.</b> Программу можно пустить мимо VPN или только через него</sub> |
+| <img src="MarinBox/docs/screens/05-routes-categories.png" width="430"><br><sub><b>Категории сайтов.</b> 123 категории geosite: блокировать или напрямую</sub> | <img src="MarinBox/docs/screens/06-settings-app.png" width="430"><br><sub><b>Настройки · Приложение.</b> Автозапуск, уведомления, темы и цвет акцента</sub> |
+| <img src="MarinBox/docs/screens/07-settings-vpn.png" width="430"><br><sub><b>Настройки · VPN.</b> Проверка связи, автопереподключение, тип пинга</sub> | <img src="MarinBox/docs/screens/08-settings-vpn-dns.png" width="430"><br><sub><b>Настройки · VPN.</b> TUN-режим и DNS через VPN (DoH)</sub> |
+| <img src="MarinBox/docs/screens/09-settings-xray.png" width="430"><br><sub><b>Настройки · Xray.</b> Версия ядра, обновление, уровень журнала</sub> | <img src="MarinBox/docs/screens/10-settings-about.png" width="430"><br><sub><b>Настройки · О программе.</b> Обновления, changelog, поддержка</sub> |
+| <img src="MarinBox/docs/screens/11-search.png" width="430"><br><sub><b>Поиск по настройкам.</b> Ctrl+K ищет по всем полям с переходом к нужному</sub> | <img src="MarinBox/docs/screens/12-add.png" width="430"><br><sub><b>Подписка или ключ.</b> Ссылка подписки, ключи или файл</sub> |
+| <img src="MarinBox/docs/screens/13-changelog.png" width="430"><br><sub><b>Что нового.</b> Changelog показывается один раз на версию</sub> | <img src="MarinBox/docs/screens/14-cabinet.png" width="430"><br><sub><b>Кабинет.</b> Баланс, оплата, промокоды, ключи и подписки</sub> |
 
 <div align="center">
-  <img src="MarinBox/docs/shot-cabinet.png" width="380" alt="Кабинет">
+
+<img src="MarinBox/docs/screens/15-light.png" width="620" alt="Светлая тема">
+<br><sub><b>Светлая тема</b> — или «как в системе», плюс свой цвет акцента</sub>
+
 </div>
 
 ## Возможности
