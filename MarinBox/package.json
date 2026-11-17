@@ -1,6 +1,6 @@
 {
   "name": "marinbox",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "MarinBox — клиент MarinVPN для Windows",
   "main": "main.js",
   "author": "MarinVPN",
