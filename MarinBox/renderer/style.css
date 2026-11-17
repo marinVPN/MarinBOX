@@ -168,6 +168,15 @@ main::-webkit-scrollbar-thumb { background: var(--glass-hi); border-radius: 6px;
 }
 .item:hover { background: var(--glass-hi); }
 .item.sel { border-color: rgba(53, 230, 207, .55); background: linear-gradient(135deg, rgba(53, 230, 207, .14), rgba(122, 92, 255, .14)); }
+/* служебная запись панели: остаток трафика — видна, но не выбирается */
+.item.info {
+  background: rgba(122, 92, 255, .08); border-color: rgba(122, 92, 255, .22); cursor: default;
+}
+.item.info:hover { background: rgba(122, 92, 255, .08); }
+.item.info .iname { color: var(--muted); }
+.proto.info { background: rgba(122, 92, 255, .18); color: #cfc6ff; }
+:root[data-theme="light"] .item.info { background: rgba(122, 92, 255, .07); border-color: rgba(122, 92, 255, .2); }
+:root[data-theme="light"] .proto.info { background: rgba(122, 92, 255, .12); color: #5b46c9; }
 .proto { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 2px 7px; border-radius: 6px; background: rgba(122, 92, 255, .25); color: #cfc6ff; text-transform: uppercase; }
 :root[data-theme="light"] .proto { background: rgba(122, 92, 255, .14); color: #5b46c9; }
 .country-flag { flex: 0 0 24px; width: 24px; height: 18px; object-fit: contain; text-align: center; font-size: 18px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
