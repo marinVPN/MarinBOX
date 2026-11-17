@@ -170,6 +170,12 @@ function findServer(id) {
   return null;
 }
 
+// Панель кладёт в подписку служебную запись об остатке трафика («Осталось - ∞ ✅»).
+// В списке её показываем, но подключиться и пропинговать нельзя — это не сервер.
+const SERVICE_SERVER = /^\s*(осталось|срок действия|трафик|подписка)/i;
+const isServiceServer = (s) => SERVICE_SERVER.test(String(s && s.name || ''));
+const connectableServers = (servers) => (servers || []).filter((s) => !isServiceServer(s));
+
 // ───────────── подписки ─────────────
 function parseUserInfo(h) {
   if (!h) return null;
@@ -291,10 +297,23 @@ function icmpPing(host, timeout = 3000) {
   });
 }
 
-async function pingServer(server, type) {
-  if (type === 'proxy-get' || type === 'proxy-head') return proxyPing(type === 'proxy-head' ? 'HEAD' : 'GET');
+async function pingOnce(server, type) {
+  if (type === 'proxy-get' || type === 'proxy-head') {
+    // Без туннеля запрос уйдёт напрямую и покажет задержку не до сервера — меряем TCP до узла.
+    if (status.state !== 'connected') return tcpPing(server.host, server.port);
+    return proxyPing(type === 'proxy-head' ? 'HEAD' : 'GET');
+  }
   if (type === 'icmp') return icmpPing(server.host);
   return tcpPing(server.host, server.port);
+}
+
+// Два замера и минимум: первый запрос платит за DNS и TLS-хендшейк и врёт в большую сторону.
+async function pingServer(server, type) {
+  const first = await pingOnce(server, type);
+  const second = await pingOnce(server, type);
+  if (first == null) return second;
+  if (second == null) return first;
+  return Math.min(first, second);
 }
 
 // ───────────── живая статистика Xray ─────────────
@@ -532,6 +551,7 @@ async function connect(id, { retry = false } = {}) {
   if (!retry) cancelReconnect();
   const server = findServer(id);
   if (!server) throw new Error('Сервер не найден');
+  if (isServiceServer(server)) throw new Error('Это служебная запись подписки, а не сервер — выберите узел из списка');
   if (xray || elevated || status.state === 'connected') await disconnect({ preserveReconnect: retry });
   setStatus({ state: 'connecting', serverId: id, error: null, stage: 'core' });
   try {
@@ -967,16 +987,22 @@ function setupIpc() {
     const sub = store.subs.find((s) => s.id === id);
     if (sub && sub.servers.some((s) => s.id === status.serverId) && status.state !== 'disconnected') await disconnect();
     store.subs = store.subs.filter((s) => s.id !== id);
-    if (!findServer(store.selectedId)) store.selectedId = (store.subs[0] && store.subs[0].servers[0] || {}).id || null;
+    if (!findServer(store.selectedId) || isServiceServer(findServer(store.selectedId))) {
+      const first = connectableServers(store.subs.flatMap((s) => s.servers || []))[0];
+      store.selectedId = (first || {}).id || null;
+    }
     notify();
   });
-  handle('server:select', async (id) => { if (findServer(id)) { store.selectedId = id; notify(); } });
+  handle('server:select', async (id) => { const s = findServer(id); if (s && !isServiceServer(s)) { store.selectedId = id; notify(); } });
   handle('ping:all', async (subId, requestedType) => {
     const sub = store.subs.find((s) => s.id === subId);
     const type = ['proxy-get', 'proxy-head', 'tcp', 'icmp'].includes(requestedType)
       ? requestedType : (store.settings?.pingType || 'proxy-get');
     const out = {};
-    if (sub) await Promise.all(sub.servers.map(async (s) => { out[s.id] = await pingServer(s, type); }));
+    if (sub) {
+      // по одному: параллельные запросы делят одну сессию и «накручивают» задержку друг другу
+      for (const s of connectableServers(sub.servers)) out[s.id] = await pingServer(s, type);
+    }
     return out;
   });
   handle('vpn:connect', async (id) => connect(id));
@@ -1093,6 +1119,10 @@ if (!app.requestSingleInstanceLock()) {
     await sysproxy.cleanupStale(PROXY_STR);
     pendingLink = process.argv.find((a) => /^marinbox:/i.test(a)) || null;
     createWindow();
+    // съёмка скриншотов — только в dev-режиме, по явному флагу
+    if (!app.isPackaged && process.env.MARINBOX_SHOT === '1') {
+      require('./scripts/shot-harness')({ getWindow: () => win, getWidget: () => widget, createWidget });
+    }
     tray = new Tray(trayImage('off'));
     tray.on('click', showWin);
     rebuildTray();
